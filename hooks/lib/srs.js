@@ -23,8 +23,10 @@ export const LEVELS = [
   [600, 'Brasileiro de coração'],
 ]
 
+// YYYY-MM-DD in local time, built by hand: the hooks runtime may have no locale data.
 export function dayOf(t) {
-  return new Date(t).toLocaleDateString('sv-SE')
+  const d = new Date(t)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 export function norm(item) {

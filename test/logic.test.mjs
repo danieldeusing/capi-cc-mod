@@ -2,8 +2,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { replay, dueItems, newAllowance, levelFor, PLACEMENT_BOX, NEW_PER_DAY } from '../hooks/lib/srs.js'
-import { parseJsonl, toJsonl, merge } from '../hooks/lib/log.js'
-import { buildRequest, parseCards } from '../hooks/lib/cards.js'
+import { parseJsonl, toJsonl, merge, monthFile } from '../hooks/lib/log.js'
+import { buildRequest, parseCards, activityHint } from '../hooks/lib/cards.js'
 
 const MIN = 60_000
 const DAY = 86_400_000
@@ -126,11 +126,27 @@ test('buildRequest skips items already waiting and falls back to bonus cards at 
   const es = Array.from({ length: NEW_PER_DAY }, (_, i) => answer(T0 + i, 'w' + i, 'ok'))
   const s = replay(es, T0)
   const req = buildRequest({ now: T0 + 1000, state: s, queue: [], activity: [], total: 10 })
-  assert.equal(req.count, 3)
-  assert.match(req.prompt, /Bonus: 3 "bonus" cards/)
+  assert.equal(req.count, 10)
+  assert.match(req.prompt, /Bonus: 10 "bonus" cards/)
   assert.doesNotMatch(req.prompt, /^New:/m)
 
   const s2 = replay([answer(T0 - 10 * DAY, 'rolar', 'ok'), answer(T0 - 2 * DAY, 'rolar', 'miss')], T0)
   const queued = buildRequest({ now: T0, state: s2, queue: [card({ item: 'Rolar' })], activity: [], total: 10 })
   assert.doesNotMatch(queued.prompt, /^Review:/m)
+})
+
+test('the activity hint never carries an assignment, a path or an argument', () => {
+  assert.equal(activityHint('Bash', 'git push origin main'), 'git push')
+  assert.equal(activityHint('Bash', '/usr/bin/git commit -m "x"'), 'git commit')
+  assert.equal(activityHint('Bash', 'TOKEN=abc123 curl https://x.example/?k=1'), 'curl')
+  assert.equal(activityHint('Bash', 'export API_KEY=abc123'), '')
+  assert.equal(activityHint('Bash', 'sudo env FOO=1 docker ps'), 'docker ps')
+  assert.equal(activityHint('Bash', 'cd /secret/dir && ls'), 'cd')
+  assert.equal(activityHint('Edit'), 'Edit')
+  assert.equal(activityHint('weird tool; rm'), '')
+})
+
+test('history files are per Mac and month, in local time', () => {
+  assert.equal(monthFile('ddStudio', Date.UTC(2026, 9, 1, 2, 0)), 'ddStudio-2026-09.jsonl') // still Sep 30 in Brazil
+  assert.equal(monthFile('ddAir', T0), 'ddAir-2026-10.jsonl')
 })

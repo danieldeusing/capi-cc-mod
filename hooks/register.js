@@ -1,13 +1,14 @@
 // Capi teaches Brazilian Portuguese in the band above the prompt while Claude works.
 //
 // Where things live:
-//   $.store 'log:<day>:<session>'  this session's answers that day (one writer per key)
-//   $.store 'queue' / 'current'    the cards every session on this Mac shares
-//   iCloud ptbr/<Mac>.jsonl        each Mac's whole history; every Mac reads all of them
+//   $.store 'log:<day>:<session>'   this session's answers that day (one writer per key)
+//   $.store 'queue' / 'current'     the cards every session on this Mac shares
+//   $.store 'machine'               this Mac's name, fixed on first use
+//   iCloud ptbr/<Mac>-<YYYY-MM>.jsonl  each Mac's history per month; every Mac reads all
 
 import { replay, dayOf } from './lib/srs.js'
-import { parseJsonl, toJsonl, merge } from './lib/log.js'
-import { buildRequest, parseCards, ITEM_FORMATS } from './lib/cards.js'
+import { parseJsonl, toJsonl, merge, monthFile } from './lib/log.js'
+import { buildRequest, parseCards, activityHint, ITEM_FORMATS } from './lib/cards.js'
 
 // The facts have to be TRUE, so batches go to Opus at high effort. They run in
 // the background while cards are still queued, so the latency costs nothing.
@@ -18,8 +19,11 @@ const BATCH = 10
 const REFILL_BELOW = 4
 const POLL_MS = 3000
 const SYNC_DELAY_MS = 5000
-// A refill another session started counts as running for this long.
+// Covers one model call. A failed refill keeps the lock, so it is also the backoff.
 const REFILL_LOCK_MS = 6 * 60_000
+// A press this soon after the card changed is the second half of a double press.
+const PRESS_GUARD_MS = 800
+const FLAG_CONFIRM_MS = 10_000
 const VOICE = 'Luciana'
 const ICLOUD = 'Library/Mobile Documents/com~apple~CloudDocs/ptbr'
 
@@ -33,7 +37,7 @@ const ASK = {
 }
 
 let home = ''
-let machine = 'mac'
+let machine = ''
 let sessionId = 'session'
 let working = false
 let entries = []
@@ -41,7 +45,9 @@ let state = replay([], 0)
 let current = null
 let activity = []
 let refilling = false
+let recording = Promise.resolve()
 let syncTimer = null
+let armed = null
 let syncReport = 'not synced yet'
 let lastBatch = 'none yet'
 let effortRefused = false
@@ -50,21 +56,26 @@ export function register(on) {
   on('session.start', async ($, e, next) => {
     home = (await $.env.get('HOME')) ?? ''
     sessionId = await $.session.id()
-    try {
-      const r = await $.process.run(['scutil', '--get', 'LocalHostName'])
-      if (r.exitCode === 0 && r.stdout.trim()) machine = r.stdout.trim()
-    } catch {
-      // keeps 'mac'; only the history file's name depends on it
-    }
-    await sync($)
+    machine = await machineName($)
     current = (await $.store.get('current')) ?? null
     $.clock.every(POLL_MS, () => poll($))
-    await $.command.register({ name: 'ptbr', description: 'Capi: your Portuguese progress', immediate: true })
+    // Not awaited: a slow or offline iCloud must not hold up the first prompt.
+    sync($).catch((err) => (syncReport = 'sync failed: ' + (err?.message ?? err)))
+    await $.command.register({
+      name: 'ptbr',
+      description: 'Capi: your Portuguese progress (skip: next card)',
+      argumentHint: '[skip]',
+      immediate: true,
+    })
     return next(e)
   })
 
-  on('command.run', { command: 'ptbr' }, async ($) => {
-    await sync($)
+  on('command.run', { command: 'ptbr' }, async ($, e) => {
+    if (e.args.trim() === 'skip') {
+      await advance($)
+      return { text: 'Capi: card skipped' }
+    }
+    await sync($).catch((err) => (syncReport = 'sync failed: ' + (err?.message ?? err)))
     return { text: statsText(await $.clock.now()) }
   })
 
@@ -77,16 +88,16 @@ export function register(on) {
     return next(e)
   })
 
+  // A subagent's turn ends inside the main turn; only the main one stops the band.
   on('turn.complete', async ($, e, next) => {
+    if (e.agentId) return next(e)
     working = false
     $.ui.invalidate('ui.render')
     return next(e)
   })
 
-  // Remembers WHAT Claude is doing (the tool, or a Bash command's first two
-  // words), never arguments, so a card can match the moment without secrets.
   on('tool.call', async ($, e, next) => {
-    const hint = e.tool === 'Bash' ? String(e.command ?? '').trim().split(/\s+/).slice(0, 2).join(' ') : e.tool
+    const hint = activityHint(e.tool, e.command)
     if (hint) activity = [hint, ...activity.filter((a) => a !== hint)].slice(0, 6)
     return next(e)
   })
@@ -94,69 +105,71 @@ export function register(on) {
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (!e.props.isWorking || e.props.hasSurvey) return next(e)
     const { Box, Text, Button } = $.ui.resolve(e)
-    return Box({
-      flexDirection: 'column',
-      children: view(Box, Text, Button, {
-        pick: (i) => pick($, i),
-        grade: (ok) => grade($, ok),
-        next: () => nextCard($),
-        speak: () => speak($),
-        flag: () => flag($),
-      }),
+    const parts = view(Box, Text, Button, {
+      pick: (id, i) => pick($, id, i),
+      grade: (id, ok) => grade($, id, ok),
+      next: (id) => nextCard($, id),
+      speak: () => speak($),
+      flag: (id) => flag($, id),
     })
+    return Box({ flexDirection: 'column', children: fit(parts, e.props.maxRows ?? 99, e.props.bodyColumns ?? 80) })
   })
+}
+
+async function machineName($) {
+  const saved = await $.store.get('machine')
+  if (saved) return saved
+  let name = ''
+  for (const argv of [['scutil', '--get', 'LocalHostName'], ['hostname', '-s']]) {
+    try {
+      const r = await $.process.run(argv)
+      if (r.exitCode === 0 && /^[\w.-]+$/.test(r.stdout.trim())) name = r.stdout.trim()
+    } catch {
+      // try the next one
+    }
+    if (name) break
+  }
+  name ||= 'mac-' + Math.random().toString(36).slice(2, 8)
+  await $.store.set('machine', name)
+  return name
 }
 
 // ---- drawing ---------------------------------------------------------------
 
+// Parts of the card: { make(cut) } for text that may be cut to one line,
+// { node } otherwise. `drop` marks what goes first when the band is short.
 function view(Box, Text, Button, act) {
   const s = state
-  const head = Text({
-    dimColor: true,
-    children: [`🦫 Capi · ${s.level.name} · 🔥 ${s.streak} dia${s.streak === 1 ? '' : 's'} · combo x${s.combo}`],
+  const text = (t, props = {}, drop = 0) => ({
+    text: t,
+    drop,
+    make: (cut) => Text({ ...props, wrap: cut ? 'truncate-end' : 'wrap', children: [t] }),
   })
+  const node = (n) => ({ node: n })
+  const head = text(`🦫 Capi · ${s.level.name} · 🔥 ${s.streak} dia${s.streak === 1 ? '' : 's'} · combo x${s.combo}`, { dimColor: true }, 2)
   if (!current) {
-    const msg = refilling ? 'Capi está preparando cartas… ☕' : 'Capi está sem cartas. Já já tem mais!'
-    return [head, Text({ children: [msg] })]
+    return [head, text(refilling ? 'Capi está preparando cartas… ☕' : 'Capi está sem cartas. Já já tem mais!')]
   }
   const { card, stage } = current
-  const row = (children) => Box({ flexDirection: 'row', columnGap: 3, children })
+  const id = card.id
+  const row = (children) => node(Box({ flexDirection: 'row', columnGap: 3, children }))
+  const flagLabel = current.flagged ? '🚩 marcado' : armed?.id === id ? '🚩 de novo = confirmar' : '🚩 tá errado?'
   const tools = [
     Button({ key: 'speak', label: '🔊 ouvir', hotkey: '8', plain: true, onPress: act.speak }),
-    Button({
-      key: 'flag',
-      label: current.flagged ? '🚩 marcado' : '🚩 tá errado?',
-      hotkey: '9',
-      plain: true,
-      dimColor: Boolean(current.flagged),
-      onPress: act.flag,
-    }),
+    Button({ key: 'flag', label: flagLabel, hotkey: '9', plain: true, dimColor: Boolean(current.flagged), onPress: () => act.flag(id) }),
   ]
-  const next = Button({ key: 'next', label: 'próxima', hotkey: '1', plain: true, onPress: act.next })
+  const next = Button({ key: 'next', label: 'próxima', hotkey: '1', plain: true, onPress: () => act.next(id) })
+  const note = text('📚 ' + card.note, { dimColor: true }, 1)
 
   if (card.format === 'bonus') {
-    return [
-      head,
-      Text({ bold: true, children: [ASK.bonus] }),
-      Text({ wrap: 'wrap', children: [card.question] }),
-      Text({ wrap: 'wrap', children: [card.explain] }),
-      Text({ dimColor: true, wrap: 'wrap', children: ['📚 ' + card.note] }),
-      row([next, ...tools]),
-    ]
+    return [head, text(ASK.bonus, { bold: true }), text(card.question), text(card.explain), note, row([next, ...tools])]
   }
-
   if (stage === 'quiz') {
     const options = card.options.map((o, i) =>
-      Button({ key: 'opt-' + i, label: o, hotkey: String(i + 1), plain: true, onPress: () => act.pick(i) }),
+      Button({ key: 'opt-' + i, label: o, hotkey: String(i + 1), plain: true, onPress: () => act.pick(id, i) }),
     )
-    return [
-      head,
-      Text({ bold: true, children: ['❓ ' + ASK[card.format]] }),
-      Text({ wrap: 'wrap', children: [card.question] }),
-      row([...options, ...tools]),
-    ]
+    return [head, text('❓ ' + ASK[card.format], { bold: true }), text(card.question), row([...options, ...tools])]
   }
-
   const verdict = current.quizOk
     ? `✅ Certo! +${current.gain} · ${card.capiRight}`
     : `❌ Errou! Era «${card.options[card.answer]}» · ${card.capiWrong}`
@@ -164,53 +177,68 @@ function view(Box, Text, Button, act) {
     ? [next]
     : [
         Text({ children: [`Kanntest du «${card.item}»?`] }),
-        Button({ key: 'yes', label: 'sim', hotkey: '1', plain: true, onPress: () => act.grade(true) }),
-        Button({ key: 'no', label: 'não', hotkey: '2', plain: true, onPress: () => act.grade(false) }),
+        Button({ key: 'yes', label: 'sim', hotkey: '1', plain: true, onPress: () => act.grade(id, true) }),
+        Button({ key: 'no', label: 'não', hotkey: '2', plain: true, onPress: () => act.grade(id, false) }),
       ]
   return [
     head,
-    Text({ color: current.quizOk ? 'green' : 'red', wrap: 'wrap', children: [verdict] }),
-    Text({ wrap: 'wrap', children: [`${card.explain} (Fonte: ${card.source})`] }),
-    Text({ dimColor: true, wrap: 'wrap', children: ['📚 ' + card.note] }),
+    text(verdict, { color: current.quizOk ? 'green' : 'red' }),
+    text(`${card.explain} (Fonte: ${card.source})`),
+    note,
     row([...ask, ...tools]),
   ]
 }
 
+// A tree taller than the band scrolls, and then the digit hotkeys stop working.
+// So: drop the note, then the header, then cut every text to one line.
+function fit(parts, maxRows, cols) {
+  const rows = (p, cut) => (p.make && !cut ? Math.max(1, Math.ceil(p.text.length / Math.max(cols, 20))) : 1)
+  const height = (list, cut) => list.reduce((n, p) => n + rows(p, cut), 0)
+  let keep = parts
+  for (const level of [1, 2]) if (height(keep, false) > maxRows) keep = keep.filter((p) => p.drop !== level)
+  const cut = height(keep, false) > maxRows
+  return keep.map((p) => (p.make ? p.make(cut) : p.node))
+}
+
 // ---- answering -------------------------------------------------------------
 
-// True when the store still holds the card at the stage this session shows.
-// Another session may have answered it meanwhile; then this one follows.
-async function stillMine($) {
+// True when the press belongs to the card and stage that are current here and
+// in the store. Otherwise another session moved on, and this one follows.
+async function stillMine($, id, stage) {
   const shared = (await $.store.get('current')) ?? null
-  if (!current || !shared || shared.card.id !== current.card.id || shared.stage !== current.stage) {
+  const now = await $.clock.now()
+  const same = (c) => c && c.card.id === id && c.stage === stage
+  if (!same(current) || !same(shared)) {
     current = shared
     $.ui.invalidate('ui.render')
     return false
   }
-  return true
+  return now - (current.at ?? 0) >= PRESS_GUARD_MS
 }
 
-async function pick($, i) {
-  if (!current || current.stage !== 'quiz' || !(await stillMine($))) return
+async function pick($, id, i) {
+  if (!(await stillMine($, id, 'quiz'))) return
   const card = current.card
   const quizOk = i === card.answer
   const gain = quizOk ? 10 + 2 * Math.min(state.combo, 5) : 0
   const graded = ITEM_FORMATS.has(card.format)
-  current = { ...current, stage: 'reveal', quizOk, gain, graded }
+  const now = await $.clock.now()
+  current = { ...current, stage: 'reveal', at: now, quizOk, gain, graded }
   await $.store.set('current', current)
   $.ui.invalidate('ui.render')
-  if (graded) await record($, answerEntry(await $.clock.now(), card, quizOk, quizOk ? 'ok' : 'miss'))
+  if (graded) await record($, answerEntry(now, card, quizOk, quizOk ? 'ok' : 'miss'))
 }
 
-async function grade($, ok) {
-  if (!current || current.stage !== 'reveal' || current.graded || !(await stillMine($))) return
+async function grade($, id, ok) {
+  if (!current || current.graded || !(await stillMine($, id, 'reveal'))) return
   await record($, answerEntry(await $.clock.now(), current.card, current.quizOk, ok ? 'ok' : 'miss'))
   await advance($)
 }
 
 // "próxima": after a graded reveal, and on a bonus card.
-async function nextCard($) {
-  if (!current || !(await stillMine($))) return
+async function nextCard($, id) {
+  const stage = current?.stage ?? 'quiz'
+  if (!(await stillMine($, id, stage))) return
   if (current.card.format === 'bonus') await record($, answerEntry(await $.clock.now(), current.card, null, null))
   await advance($)
 }
@@ -236,7 +264,7 @@ async function advance($) {
   // ponytail: two sessions advancing at the same instant can skip one card; harmless.
   const card = queue.shift() ?? null
   await $.store.set('queue', queue)
-  current = card ? { card, stage: 'quiz' } : null
+  current = card ? { card, stage: 'quiz', at: await $.clock.now() } : null
   await $.store.set('current', current)
   $.ui.invalidate('ui.render')
   refillIfLow($)
@@ -253,17 +281,24 @@ async function speak($) {
   }
 }
 
-// A flagged fact is never used again. Capi then re-checks the claim and says in
-// the transcript whether it really was wrong.
-async function flag($) {
-  if (!current || current.flagged) return
+// The first 9 arms the flag, a second 9 within 10 s confirms it: a stray key
+// must not ban a fact and buy a re-check. A flagged fact is never used again,
+// and Capi says in the transcript whether it really was wrong.
+async function flag($, id) {
+  if (!current || current.flagged || !(await stillMine($, id, current.stage))) return
+  const now = await $.clock.now()
+  if (armed?.id !== id || now - armed.t > FLAG_CONFIRM_MS) {
+    armed = { id, t: now }
+    $.ui.invalidate('ui.render')
+    return
+  }
+  armed = null
   const card = current.card
   const fact = `${card.question} → ${card.explain}`
   current = { ...current, flagged: true }
   await $.store.set('current', current)
   $.ui.invalidate('ui.render')
-  const t = await $.clock.now()
-  await record($, { type: 'flag', id: `${t.toString(36)}-f${Math.random().toString(36).slice(2, 8)}`, t, machine, cardId: card.id, fact })
+  await record($, { type: 'flag', id: `${now.toString(36)}-f${Math.random().toString(36).slice(2, 8)}`, t: now, machine, cardId: id, fact })
   const r = await complete($, CHECK, {
     system:
       'You fact-check one quiz card. Answer in German, in at most three sentences: is the fact correct, wrong or doubtful, and what is true. Name the kind of source you rely on.',
@@ -274,7 +309,13 @@ async function flag($) {
 
 // ---- history ---------------------------------------------------------------
 
-async function record($, entry) {
+// One at a time: two overlapping get-then-set on this session's key would drop one.
+function record($, entry) {
+  recording = recording.then(() => append($, entry)).catch((err) => (syncReport = 'recording failed: ' + (err?.message ?? err)))
+  return recording
+}
+
+async function append($, entry) {
   const key = `log:${dayOf(entry.t)}:${sessionId}`
   const mine = (await $.store.get(key)) ?? []
   await $.store.set(key, [...mine, entry])
@@ -285,13 +326,15 @@ async function record($, entry) {
   syncTimer = $.clock.after(SYNC_DELAY_MS, () => sync($))
 }
 
-// Reads every session's answers on this Mac and every Mac's iCloud file, then
-// writes this Mac's whole history back to its own file. A past day's store key
-// is dropped only once the file, read back, holds every one of its entries.
+// Reads every session's answers on this Mac and every Mac's iCloud files, then
+// rewrites the months this Mac still has store entries for. A past day's store
+// key is dropped only once a file, read back, holds every one of its entries.
+//
+// Never writes a month file it could not read, never one with fewer entries
+// than it wrote before, and never in place: a reader could see half a file.
 async function sync($) {
   const now = await $.clock.now()
   const dir = home + '/' + ICLOUD
-  const own = machine + '.jsonl'
   const keys = (await $.store.keys()).filter((k) => k.startsWith('log:'))
   const local = []
   for (const k of keys) {
@@ -299,59 +342,85 @@ async function sync($) {
     if (Array.isArray(v)) local.push(...v)
   }
 
-  let listing = []
+  let listing = null
   try {
     listing = await $.fs.list(dir)
   } catch {
-    listing = []
+    listing = (await $.fs.exists(dir)) ? null : []
   }
-  const files = listing.filter((f) => f.kind === 'file' && f.name.endsWith('.jsonl')).map((f) => f.name)
-  // iCloud keeps a file it has not downloaded yet as ".<name>.icloud"
-  const evicted = listing.filter((f) => /^\..+\.jsonl\.icloud$/.test(f.name)).map((f) => f.name.slice(1, -'.icloud'.length))
+  const files = new Map()
+  const evicted = new Set()
+  for (const f of listing ?? []) {
+    if (f.kind === 'file' && f.name.endsWith('.jsonl')) files.set(f.name, f.size)
+    // iCloud keeps a file it has not downloaded yet as ".<name>.icloud"
+    const m = /^\.(.+\.jsonl)\.icloud$/.exec(f.name)
+    if (m) evicted.add(m[1])
+  }
   for (const name of evicted) {
     try {
-      await $.process.run(['brctl', 'download', dir + '/.' + name + '.icloud'])
+      await $.process.run(['brctl', 'download', `${dir}/.${name}.icloud`])
     } catch {
       // stays unread and counted below; the next sync asks again
     }
   }
 
+  const readable = new Set()
   const remote = []
-  let read = 0
   let bad = 0
-  let ownReadable = !evicted.includes(own)
-  for (const name of files) {
+  for (const [name, size] of files) {
     try {
-      const r = parseJsonl(await $.fs.read(dir + '/' + name))
+      const text = await $.fs.read(`${dir}/${name}`)
+      // a file iCloud has not materialised can read as empty
+      if (size > 0 && !text) continue
+      const r = parseJsonl(text)
       remote.push(...r.entries)
       bad += r.bad
-      read += 1
+      readable.add(name)
     } catch {
-      if (name === own) ownReadable = false
+      // unreadable: counted below, and never written
     }
   }
   entries = merge(entries, local, remote)
   state = replay(entries, now)
-  const total = files.length + evicted.length
-  syncReport = `${read} of ${total} iCloud file${total === 1 ? '' : 's'} read` + (bad ? `, ${bad} damaged lines skipped` : '')
-
-  // Never overwrite this Mac's file with less than it holds.
-  if (!ownReadable) {
-    syncReport += ` · ${own} not readable, not written`
+  if (listing === null) {
+    syncReport = 'iCloud folder not readable, nothing written'
     return
   }
-  try {
-    await $.process.run(['mkdir', '-p', dir])
-    await $.fs.write(dir + '/' + own, toJsonl(entries.filter((e) => e.machine === machine)))
-    const back = new Set(parseJsonl(await $.fs.read(dir + '/' + own)).entries.map((e) => e.id))
-    const today = dayOf(now)
-    for (const k of keys) {
-      if (k.split(':')[1] >= today) continue
-      const v = (await $.store.get(k)) ?? []
-      if (v.every((e) => back.has(e.id))) await $.store.delete(k)
+  const total = files.size + evicted.size
+  syncReport = `${readable.size} of ${total} iCloud file${total === 1 ? '' : 's'} read` + (bad ? `, ${bad} damaged lines skipped` : '')
+
+  const months = new Set(local.filter((e) => e.machine === machine).map((e) => monthFile(machine, e.t)))
+  const safe = new Set()
+  if (months.size) await $.process.run(['mkdir', '-p', dir])
+  for (const name of months) {
+    const path = `${dir}/${name}`
+    if (evicted.has(name) || (files.has(name) && !readable.has(name)) || (!files.has(name) && (await $.fs.exists(path)))) {
+      syncReport += ` · ${name} unreadable, not written`
+      continue
     }
-  } catch (err) {
-    syncReport += ` · writing ${own} failed: ${err?.message ?? err}`
+    const mine = entries.filter((e) => e.machine === machine && monthFile(machine, e.t) === name)
+    const before = (await $.store.get('written:' + name)) ?? 0
+    if (mine.length < before) {
+      syncReport += ` · ${name}: ${mine.length} entries but ${before} written before, not written`
+      continue
+    }
+    try {
+      await $.fs.write(path + '.tmp', toJsonl(mine))
+      const mv = await $.process.run(['mv', '-f', path + '.tmp', path])
+      if (mv.exitCode !== 0) throw new Error(mv.stderr.trim() || 'mv failed')
+      const back = parseJsonl(await $.fs.read(path)).entries
+      await $.store.set('written:' + name, back.length)
+      for (const e of back) safe.add(e.id)
+    } catch (err) {
+      syncReport += ` · writing ${name} failed: ${err?.message ?? err}`
+    }
+  }
+
+  const today = dayOf(now)
+  for (const k of keys) {
+    if (k.split(':')[1] >= today) continue
+    const v = (await $.store.get(k)) ?? []
+    if (v.every((e) => safe.has(e.id))) await $.store.delete(k)
   }
 }
 
@@ -369,18 +438,24 @@ async function refill($) {
   const queue = (await $.store.get('queue')) ?? []
   if (queue.length >= REFILL_BELOW) return
   const now = await $.clock.now()
-  const lock = (await $.store.get('refill')) ?? 0
-  if (now - lock < REFILL_LOCK_MS) return
+  const lock = (await $.store.get('refill')) ?? null
+  if (lock?.t && now - lock.t < REFILL_LOCK_MS) return
+  // ponytail: set-then-read narrows two sessions starting at once to a tiny window; no compare-and-set exists.
+  const mine = { t: now, by: `${sessionId}:${Math.random().toString(36).slice(2, 8)}` }
+  await $.store.set('refill', mine)
+  if ((await $.store.get('refill'))?.by !== mine.by) return
   refilling = true
-  await $.store.set('refill', now)
   $.ui.invalidate('ui.render')
+  let added = 0
   try {
     await sync($)
     const req = buildRequest({ now, state, queue, activity, total: BATCH })
+    // The lock covers the model call itself, not the sync before it.
+    await $.store.set('refill', { ...mine, t: await $.clock.now() })
     const r = await complete($, GENERATE, req)
     if (!r.ok) {
       lastBatch = `failed: ${r.reason}`
-      $.ui.log(`Capi bekam keine Karten: ${r.reason}`)
+      $.ui.log(`Capi bekam keine Karten (${r.reason}); nächster Versuch in ${REFILL_LOCK_MS / 60_000} Minuten`)
       return
     }
     const { cards, dropped } = parseCards(r.text, now)
@@ -388,34 +463,41 @@ async function refill($) {
     if (cards.length === 0) $.ui.log(`Capi bekam keine brauchbaren Karten: ${lastBatch}`)
     const fresh = (await $.store.get('queue')) ?? []
     await $.store.set('queue', [...fresh, ...cards])
+    added = cards.length
   } finally {
     refilling = false
-    await $.store.set('refill', 0)
+    // Only a batch that delivered frees the lock; a failure keeps it as the backoff.
+    if (added > 0) await $.store.set('refill', null)
+    $.ui.invalidate('ui.render')
   }
-  if (!current) await advance($)
-  $.ui.invalidate('ui.render')
+  if (added > 0 && !current) await advance($)
 }
 
 // One model call. Resolves to { ok, text } or { ok: false, reason }; never rejects.
 async function complete($, opts, req) {
   const base = { model: opts.model, system: req.system, prompt: req.prompt, maxTokens: opts.maxTokens, timeoutMs: opts.timeoutMs }
-  let r
-  try {
-    r = await $.model.complete(effortRefused ? base : { ...base, effort: opts.effort })
-  } catch (err) {
-    if (effortRefused) return { ok: false, reason: String(err?.message ?? err) }
-    // A build that refuses `effort` runs at the model's default, and says so once.
-    effortRefused = true
-    $.ui.log(`Capi: effort "${opts.effort}" was refused (${err?.message ?? err}); using the model's default effort`)
+  const answer = (r) =>
+    typeof r === 'string' ? { ok: true, text: r } : r?.isAnswered ? { ok: true, text: r.text } : { ok: false, reason: r?.reason ?? 'no answer' }
+  if (!effortRefused) {
     try {
-      r = await $.model.complete(base)
-    } catch (err2) {
-      return { ok: false, reason: String(err2?.message ?? err2) }
+      return answer(await $.model.complete({ ...base, effort: opts.effort }))
+    } catch (err) {
+      // Only when the same call without `effort` goes through was `effort` the problem.
+      try {
+        const r = answer(await $.model.complete(base))
+        effortRefused = true
+        $.ui.log(`Capi: effort "${opts.effort}" was refused (${err?.message ?? err}); using the model's default effort`)
+        return r
+      } catch {
+        return { ok: false, reason: String(err?.message ?? err) }
+      }
     }
   }
-  if (typeof r === 'string') return { ok: true, text: r }
-  if (r?.isAnswered) return { ok: true, text: r.text }
-  return { ok: false, reason: r?.reason ?? 'no answer' }
+  try {
+    return answer(await $.model.complete(base))
+  } catch (err) {
+    return { ok: false, reason: String(err?.message ?? err) }
+  }
 }
 
 // Follows the card another session moved to, and keeps cards coming.

@@ -8,7 +8,21 @@ export const ITEM_FORMATS = new Set(['cloze', 'meaning'])
 const QUIZ_FORMATS = new Set(['tf', 'mc', 'number', 'cloze', 'meaning'])
 const KINDS = new Set(['spoken', 'grammar', 'vocab'])
 const AVOID_LIMIT = 400
-const BONUS_ONLY = 3
+const WEEKDAYS = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado']
+const MONTHS = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro']
+const WRAPPERS = new Set(['sudo', 'env', 'export', 'time', 'nohup', 'exec'])
+
+// What Claude is doing, safe to put in a prompt: a tool's name, or a shell
+// command's program and subcommand. Assignments, paths and arguments, which
+// is where a secret would be, never get through.
+export function activityHint(tool, command) {
+  if (tool !== 'Bash') return /^[\w-]+$/.test(tool ?? '') ? tool : ''
+  const words = String(command ?? '').trim().split(/\s+/).filter((w) => !w.includes('='))
+  while (WRAPPERS.has(words[0])) words.shift()
+  const program = (words[0] ?? '').split('/').pop()
+  if (!/^[\w.-]+$/.test(program)) return ''
+  return /^[a-z][a-z0-9-]*$/.test(words[1] ?? '') ? `${program} ${words[1]}` : program
+}
 
 export const SYSTEM = `You write quiz cards for "Capi", a cheeky capybara who teaches Brazilian Portuguese inside a coding tool while the developer waits.
 
@@ -51,14 +65,11 @@ export function buildRequest({ now, state, queue, activity, total }) {
     .slice(0, total - 1)
   const queuedNew = queue.filter((c) => c.kind !== 'bonus' && !state.items.has(norm(c.item))).length
   const fresh = Math.min(newAllowance(state, queuedNew), total - due.length - 1)
-  const bonus = due.length + fresh === 0 ? BONUS_ONLY : 1
+  // Bonus-only batches are full size: a call costs about the same for 3 cards or 10.
+  const bonus = due.length + fresh === 0 ? total : 1
 
-  const date = new Date(now).toLocaleDateString('pt-BR', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  })
+  const d = new Date(now)
+  const date = `${WEEKDAYS[d.getDay()]}, ${d.getDate()} de ${MONTHS[d.getMonth()]} de ${d.getFullYear()}`
   const known = [...state.items.values()].map((it) => it.item).slice(-AVOID_LIMIT)
   const lines = [`Today is ${date}. Write ${due.length + fresh + bonus} cards.`, '']
 
@@ -123,7 +134,7 @@ function isCard(c) {
   if (!c || typeof c !== 'object' || !isText(c.question) || !isText(c.explain)) return false
   if (c.format === 'bonus') return c.kind === 'bonus' && isText(c.note)
   if (!QUIZ_FORMATS.has(c.format) || !KINDS.has(c.kind)) return false
-  if (!isText(c.item) || !isText(c.de) || !isText(c.note) || !isText(c.source)) return false
+  if (![c.item, c.de, c.note, c.source, c.capiRight, c.capiWrong].every(isText)) return false
   if (!Array.isArray(c.options) || !c.options.every(isText)) return false
   const n = c.options.length
   if (c.format === 'tf' ? n !== 2 : n < 3 || n > 4) return false

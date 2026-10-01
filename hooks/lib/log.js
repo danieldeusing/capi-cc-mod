@@ -1,4 +1,11 @@
-// The answer log as JSON lines: one file per Mac in iCloud Drive, merged on read.
+// The answer log as JSON lines: one file per Mac and month in iCloud Drive,
+// merged on read. A month stays far below the 4 MiB a mod may read or write.
+
+import { dayOf } from './srs.js'
+
+export function monthFile(machine, t) {
+  return `${machine}-${dayOf(t).slice(0, 7)}.jsonl`
+}
 
 export function parseJsonl(text) {
   const entries = []

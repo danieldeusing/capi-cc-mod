@@ -9,10 +9,11 @@ Portuguese expression, with German explanations. Answer with the digit keys
 | --- | --- |
 | `1`–`4` | answer the quiz, then `sim`/`não`: did you know the expression? |
 | `8` | 🔊 hear it (macOS voice *Luciana*) |
-| `9` | 🚩 the fact is wrong: it is never used again, and Capi re-checks it |
+| `9`, then `9` again | 🚩 the fact is wrong: it is never used again, and Capi re-checks it |
 
 `/ptbr` shows level, streak, points, what is due, and how the last sync and card
-generation went. It answers instantly, also while Claude works.
+generation went. It answers instantly, also while Claude works. `/ptbr skip` drops
+the current card.
 
 ## How it learns
 
@@ -40,8 +41,10 @@ Change them at the top of `hooks/register.js` (`GENERATE`, `CHECK`).
 
 - `$.store` (`~/.claude/plugins/store/`): the shared card queue and the answers
   not yet folded into the history file
-- `~/Library/Mobile Documents/com~apple~CloudDocs/ptbr/<Mac>.jsonl`: each Mac's
-  whole history. Every Mac reads every file and writes only its own.
+- `~/Library/Mobile Documents/com~apple~CloudDocs/ptbr/<Mac>-<YYYY-MM>.jsonl`: each
+  Mac's history, one file per month. Every Mac reads every file and writes only its
+  own, through a temporary file and a rename, and never with fewer entries than
+  it wrote before.
 
 ## Install
 
