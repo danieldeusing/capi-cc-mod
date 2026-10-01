@@ -28,7 +28,7 @@ Language rules:
 - The card's sentence uses the item naturally.
 
 Formats:
-- "tf": the question is a statement, options ["verdade","mentira"], answer 0 or 1. About a third are false; a false one is clearly false and "explain" says what is true.
+- "tf": the question is a statement making exactly ONE checkable claim, options ["verdade","mentira"], answer 0 or 1. About a third are false; a false one is clearly false and "explain" says what is true.
 - "mc": the question asks about the fact; 3 or 4 options.
 - "number": the question asks for a number; 3 or 4 plausible numbers as options.
 - "cloze": the sentence with the item replaced by "___"; 3 or 4 candidate fillers as options, exactly one is the item.
