@@ -186,6 +186,9 @@ function view(Box, Text, Button, act) {
     make: (cut) => Text({ ...props, wrap: cut ? 'truncate-end' : 'wrap', children: [t] }),
   })
   const node = (n) => ({ node: n })
+  // An icon in a column of its own, so the header and the question start their
+  // text at the same place whatever the icon's drawn width.
+  const icon = (glyph) => Box({ width: 2 + GAP, flexShrink: 0, children: [Text({ children: [glyph] })] })
   // One line of label and value pairs, labels dim, set apart by space alone:
   // the card (categoria, tipo, pergunta), then the learner. 📐 🔤 🇩🇪
   // sit at its right end and never shrink; the values give way first.
@@ -203,9 +206,8 @@ function view(Box, Text, Button, act) {
         children: [
           Box({
             flexDirection: 'row',
-            columnGap: GAP,
             flexShrink: 1,
-            children: [Text({ children: ['🦫'] }), ...[...cardPairs, ...learner].map(pair)],
+            children: [icon('🦫'), Box({ flexDirection: 'row', columnGap: GAP, flexShrink: 1, children: [...cardPairs, ...learner].map(pair) })],
           }),
           ...(side ? [Box({ flexShrink: 0, children: [side] })] : []),
         ],
@@ -220,6 +222,11 @@ function view(Box, Text, Button, act) {
     return [head, text(msg)]
   }
   const { card, stage } = current
+  const question = {
+    text: '❓ ' + card.question,
+    drop: 0,
+    make: (cut) => Box({ flexDirection: 'row', children: [icon('❓'), Text({ bold: true, wrap: cut ? 'truncate-end' : 'wrap', children: [card.question] })] }),
+  }
   const id = card.id
   // Answers on the left; 🔊 and 🚩 on the right, in line with them.
   const row = (children) =>
@@ -265,13 +272,13 @@ function view(Box, Text, Button, act) {
   const note = text('📚 ' + card.note, { dimColor: true }, 1)
 
   if (card.format === 'bonus') {
-    return [top, gap, text('❓ ' + card.question, { bold: true }), text(card.explain), ...panel, note, gap, row([next])]
+    return [top, gap, question, text(card.explain), ...panel, note, gap, row([next])]
   }
   if (stage === 'quiz') {
     const options = card.options.map((o, i) =>
       Button({ key: 'opt-' + i, label: o, hotkey: String(i + 1), plain: true, onPress: () => act.pick(id, i) }),
     )
-    return [top, gap, text('❓ ' + card.question, { bold: true }), ...(extra.length ? [gap, ...extra] : []), gap, row(options)]
+    return [top, gap, question, ...(extra.length ? [gap, ...extra] : []), gap, row(options)]
   }
   const verdict = current.quizOk
     ? `✅ Certo! +${current.gain} · ${card.capiRight}`
@@ -303,8 +310,12 @@ function tables(Box, Text, Button, list, selected, choose) {
   if (!list.length) return []
   const index = Math.min(Math.max(selected, 0), list.length - 1)
   const t = list[index]
+  // As wide as the longest verb with its ▸ and the button's frame, so the
+  // table does not move when another verb is chosen.
   const tabs = Box({
     flexDirection: 'column',
+    width: Math.max(...list.map((v) => v.verb.length)) + 4,
+    flexShrink: 0,
     children: list.map((v, i) =>
       Button({ key: 'verb-' + i, label: (i === index ? '▸ ' : '') + v.verb, plain: true, dimColor: i !== index, onPress: () => choose(i) }),
     ),

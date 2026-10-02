@@ -286,11 +286,15 @@ test('📐 🔤 🇩🇪 sit top right, 🇩🇪 on key 0, 🔊 🚩 bottom righ
     expect(words(header.children[0])).toEqual(['🦫', 'categoria', 'brasil', 'tipo', 'Fala', 'pergunta', 'Verdade ou mentira', 'nível', 'Turista 0/50', 'sequência', '0 dias', 'combo', '0'])
     expect(words(root0.children[0]).join(' ')).not.toMatch(/[·│|]/) // one structure: no separators
     // labels dim, every value and the question at full strength, the question bold
-    const values = header.children[0].children.slice(1).map((p: any) => p.children[1].props)
+    const values = header.children[0].children[1].children.map((p: any) => p.children[1].props)
     expect(values.every((v: any) => !v.dimColor)).toBe(true)
-    expect(header.children[0].children.slice(1).every((p: any) => p.children[0].props.dimColor)).toBe(true)
-    expect(root0.children[2].props.bold).toBe(true) // the question, under the blank line
-    expect(root0.children[2].children[0]).toMatch(/^❓ /)
+    expect(header.children[0].children[1].children.every((p: any) => p.children[0].props.dimColor)).toBe(true)
+    // the question, under the blank line: ❓ in the same icon column as the header's 🦫
+    const [qIcon, qText] = root0.children[2].children
+    expect(words(qIcon)).toEqual(['❓'])
+    expect(qText.props.bold).toBe(true)
+    expect(qIcon.props.width).toBe(header.children[0].children[0].props.width)
+    expect(words(header.children[0].children[0])).toEqual(['🦫'])
     // the question type lives in the header now, not above the question
     expect(await ui.find({ type: 'Text', text: /Verdade ou mentira\?/ })).toBeUndefined()
     await ui.unmount()
@@ -366,11 +370,13 @@ test('🔤 shows one verb at a time in tabs, and an open panel stands apart from
 
   // the question, a blank line, then the panel
   const root = (await ui.find({ type: 'Box' })) as any
-  const q = root.children.findIndex((c: any) => c.type === 'Text' && /ficam de fora/.test(c.children?.[0] ?? ''))
+  const words = (box: any): string[] => (box.children ?? []).flatMap((c: any) => (typeof c === 'string' ? [c] : words(c)))
+  const q = root.children.findIndex((c: any) => /ficam de fora/.test(words(c).join(' ')))
   expect(root.children[q + 1].children?.[0]).toBe(' ')
   // the verbs as tabs down the left, the table beside them
   const [tabs, table] = root.children[q + 2].children
   expect(tabs.props.flexDirection).toBe('column')
+  expect(tabs.props.width).toBe('sacar'.length + 4) // fixed by the longest verb, whichever is chosen
   expect(tabs.children.map((c: any) => c.props.key)).toEqual(['verb-0', 'verb-1'])
   expect(table.children.length).toBe(6) // the tenses, then one row per person
 
@@ -379,7 +385,7 @@ test('🔤 shows one verb at a time in tabs, and an open panel stands apart from
   const question = async (maxRows: number) => {
     const band = await $.ui.mount({ ...BAND, props: { ...BAND.props, maxRows }, surface: 'desktop' })
     const r = (await band.find({ type: 'Box' })) as any
-    return r.children.find((c: any) => c.type === 'Text' && /ficam de fora/.test(c.children?.[0] ?? '')).props.wrap
+    return r.children.find((c: any) => /ficam de fora/.test(words(c).join(' '))).children[1].props.wrap
   }
   expect(await question(11)).toBe('truncate-end')
   expect(await question(12)).toBe('wrap')
