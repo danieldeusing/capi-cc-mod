@@ -1,4 +1,4 @@
-// The learning logic, outside Claude Code: node --test test/
+// The learning logic, outside Claude Code: node --test test/*.test.mjs
 // Days and month files follow local time, so the tests pin one: Brazil's.
 process.env.TZ = 'America/Sao_Paulo'
 import { test } from 'node:test'

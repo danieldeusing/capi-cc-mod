@@ -127,7 +127,7 @@ each panel).
 ## Develop
 
 ```bash
-node --test test/                 # the learning logic, no Claude Code needed
+node --test test/*.test.mjs       # the learning logic, no Claude Code needed
 claude plugin test                # the wiring, in Claude Code's own test kit
 claude plugin validate . --strict # what Claude Code reads from the mod
 ```

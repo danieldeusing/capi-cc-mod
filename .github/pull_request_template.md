@@ -4,7 +4,7 @@
 
 ## Checks
 
-- [ ] `node --test test/` passes
+- [ ] `node --test test/*.test.mjs` passes
 - [ ] `claude plugin test` passes
 - [ ] `claude plugin validate . --strict` passes
 - [ ] A change in behaviour has a test that fails without it

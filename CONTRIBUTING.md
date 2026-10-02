@@ -22,7 +22,7 @@ must pass before it is merged.
 3. Run all three checks:
 
    ```bash
-   node --test test/                 # the learning logic; CI runs this one too
+   node --test test/*.test.mjs       # the learning logic; CI runs this one too
    claude plugin test                # the wiring, in Claude Code's own test kit
    claude plugin validate . --strict # what Claude Code reads from the mod
    ```
