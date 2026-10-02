@@ -53,6 +53,17 @@ Change them at the top of `hooks/register.js` (`GENERATE`, `CHECK`).
   own, through a temporary file and a rename, and never with fewer entries than
   it wrote before.
 
+## Settings
+
+Copy `.env.example` to `.env` beside it; git ignores `.env`. It sets the language
+taught, the learner's own language and its flag, who the learner is, the topics
+of the facts, and the conjugation table's persons and tenses. A missing file or
+key keeps the default shown in `.env.example`. Capi reads it when a session
+starts, so open a new session or run `/reload-plugins` after a change.
+
+The band's own words (Verdade ou mentira?, Nível, Kanntest du …?) stay
+Portuguese and German whatever the settings say.
+
 ## Install
 
 Needs Claude Code 2.1.287 or later with mods on: `claude plugin test`, run in an

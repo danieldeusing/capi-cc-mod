@@ -31,7 +31,7 @@ const reply = (cards: unknown[]) => ({
 })
 
 // Stands in for Claude Code: an in-memory store and file system, a mock clock.
-function engine(on: any, replies: unknown[], files = new Map<string, string>(), unreadable = new Set<string>()) {
+function engine(on: any, replies: unknown[], files = new Map<string, string>(), unreadable = new Set<string>(), env?: string) {
   const store = new Map<string, unknown>()
   const model: any[] = []
   const logs: string[] = []
@@ -51,7 +51,9 @@ function engine(on: any, replies: unknown[], files = new Map<string, string>(), 
   on('fs.list', ($: any, e: any) => ({ value: list(e.path) }))
   on('fs.exists', ($: any, e: any) => ({ value: files.has(e.path) || list(e.path).length > 0 }))
   on('fs.read', ($: any, e: any) =>
-    files.has(e.path) && !unreadable.has(e.path) ? { value: files.get(e.path) } : { deny: 'cannot read ' + e.path },
+    e.path.endsWith('/.env')
+      ? env === undefined ? { deny: 'no settings file' } : { value: env }
+      : files.has(e.path) && !unreadable.has(e.path) ? { value: files.get(e.path) } : { deny: 'cannot read ' + e.path },
   )
   on('fs.write', ($: any, e: any) => (writes.push(e.path), files.set(e.path, e.text), { value: undefined }))
   on('process.run', ($: any, e: any) => {
@@ -288,8 +290,8 @@ test('📐 🔤 🇩🇪 sit top right, 🇩🇪 on key 0, 🔊 🚩 bottom righ
 
 test('📐 and 🔤 are generated once each, at their effort, and only one panel is open at a time', async ($, on) => {
   const grammar = { grammarDe: ['«do caju» = de + o, wie ein Genitiv: der Teil DES Cashews.', '«saca só» ist Umgangssprache.'] }
-  const forms = (a: string) => [a + '1', a + '2', a + '3', a + '4']
-  const verbs = { verbs: [{ infinitive: 'ser', de: 'sein', inSentence: 'é', form: 'presente, ele', tenses: { presente: forms('sou'), 'pretérito perfeito': forms('fui'), 'pretérito imperfeito': forms('era'), futuro: forms('serei') } }] }
+  const forms = (a: string) => [a + '1', a + '2', a + '3', a + '4', a + '5']
+  const verbs = { verbs: [{ infinitive: 'ser', de: 'sein', inSentence: 'é', form: 'presente, ele', tenses: { presente: forms('sou'), 'pretérito perfeito': forms('fui'), 'pretérito imperfeito': forms('era'), futuro: forms('serei'), 'subjuntivo presente': forms('seja') } }] }
   const text = (o: unknown) => ({ ...reply([]), text: JSON.stringify(o) })
   const { model, store, clock } = engine(on, [reply(five()), text(grammar), text(verbs)])
   await start($, clock)
@@ -302,7 +304,10 @@ test('📐 and 🔤 are generated once each, at their effort, and only one panel
   await ui.press({ key: 'conj' })
   expect(model[2]).toMatchObject({ effort: 'low' })
   expect(await ui.find({ type: 'Text', text: /🔤 ser = sein · im Satz: é \(presente, ele\)/ })).toBeDefined()
-  expect(await ui.find({ type: 'Text', text: /presente: sou1 · sou2 · sou3 · sou4/ })).toBeDefined()
+  // a table as in the morning briefs: tenses across, one row per person
+  expect(await ui.find({ type: 'Text', text: 'subjuntivo presente' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: 'ele/ela' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: 'seja3' })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /📐/ })).toBeUndefined() // grammar closed when conjugation opened
 
   await ui.press({ key: 'gram' }) // back to grammar: kept, no new call
@@ -311,4 +316,21 @@ test('📐 and 🔤 are generated once each, at their effort, and only one panel
   const kept = (store.get('current') as any).card
   expect(kept.grammarDe.length).toBe(2)
   expect(kept.verbs[0].infinitive).toBe('ser')
+})
+
+test('a settings file changes what Capi asks the model for', async ($, on) => {
+  const env = 'CAPI_TOPICS=football and music\nCAPI_NATIVE_LANGUAGE=English\nCAPI_NATIVE_FLAG=🇬🇧\n'
+  const { model, clock } = engine(on, [reply(five())], new Map(), new Set(), env)
+  await start($, clock)
+  expect(model[0].prompt).toMatch(/Spread the facts across: football and music\./)
+  expect(model[0].system).toMatch(/native English speaker/)
+  const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+  expect(await ui.find({ key: 'de' })).toMatchObject({ props: { label: '🇬🇧 tradução' } })
+})
+
+test('without a settings file Capi keeps its defaults', async ($, on) => {
+  const { model, clock } = engine(on, [reply(five())])
+  await start($, clock)
+  expect(model[0].system).toMatch(/teaches Brazilian Portuguese/)
+  expect(model[0].system).toMatch(/native German speaker/)
 })

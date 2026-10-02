@@ -1,3 +1,6 @@
 # written by Claude Code each time it loads the mod
 .claude-plugin/types/
 tsconfig.json
+
+# the learner's own settings; .env.example is the template
+.env

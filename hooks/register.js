@@ -9,7 +9,8 @@
 import { replay, dayOf } from './lib/srs.js'
 import { parseJsonl, toJsonl, merge, monthFile } from './lib/log.js'
 import { buildRequest, parseCards, activityHint, germanLines, headerParts, translationRequest, parseTranslation, ITEM_FORMATS } from './lib/cards.js'
-import { grammarRequest, parseGrammar, grammarLines, conjugationRequest, parseConjugation, conjugationLines } from './lib/extras.js'
+import { grammarRequest, parseGrammar, grammarLines, conjugationRequest, parseConjugation, conjugationTables, fitsTable } from './lib/extras.js'
+import { configFrom, parseEnv, DEFAULT_CONFIG } from './lib/config.js'
 
 // The facts have to be TRUE, so batches go to Opus at high effort. They run in
 // the background while cards are still queued, so the latency costs nothing.
@@ -23,20 +24,23 @@ const EXTRAS = {
   gram: {
     icon: '📐', name: 'gramática', hotkey: '6',
     call: { model: 'claude-opus-5-5', effort: 'medium', maxTokens: 2500, timeoutMs: 120_000 },
-    has: (c) => Array.isArray(c.grammarDe), request: grammarRequest, parse: parseGrammar,
+    has: (c) => Array.isArray(c.grammarDe), request: (c) => grammarRequest(c, cfg), parse: (t) => parseGrammar(t),
     lines: (c) => grammarLines(c),
   },
   conj: {
     icon: '🔤', name: 'conjugação', hotkey: '7',
     call: { model: 'claude-opus-5-5', effort: 'low', maxTokens: 3000, timeoutMs: 120_000 },
-    has: (c) => Array.isArray(c.verbs), request: conjugationRequest, parse: parseConjugation,
-    lines: (c) => conjugationLines(c),
+    // A table made for other persons or tenses than the config's is made again.
+    has: (c) => Array.isArray(c.verbs) && c.verbs.some((v) => fitsTable(v, cfg)),
+    request: (c) => conjugationRequest(c, cfg), parse: (t) => parseConjugation(t, cfg),
+    tables: (c) => conjugationTables(c, cfg),
   },
   de: {
-    icon: '🇩🇪', name: 'tradução', hotkey: '0',
+    get icon() { return cfg.nativeFlag },
+    name: 'tradução', hotkey: '0',
     call: { model: 'claude-opus-5-5', effort: 'low', maxTokens: 1500, timeoutMs: 60_000 },
-    has: (c) => Boolean(c.questionDe || c.explainDe), request: translationRequest, parse: parseTranslation,
-    lines: (c, stage, quizOk) => germanLines(c, stage, quizOk).map((l) => '🇩🇪 ' + l),
+    has: (c) => Boolean(c.questionDe || c.explainDe), request: (c) => translationRequest(c, cfg), parse: (t) => parseTranslation(t),
+    lines: (c, stage, quizOk) => germanLines(c, stage, quizOk).map((l) => cfg.nativeFlag + ' ' + l),
   },
 }
 const BATCH = 10
@@ -64,6 +68,8 @@ const ASK = {
 }
 
 let home = ''
+// The learner's languages, topics and conjugation table, from the plugin's .env.
+let cfg = DEFAULT_CONFIG
 let machine = ''
 let sessionId = 'session'
 let entries = []
@@ -86,6 +92,7 @@ export function register(on) {
   on('session.start', async ($, e, next) => {
     home = (await $.env.get('HOME')) ?? ''
     sessionId = await $.session.id()
+    cfg = await loadConfig($)
     machine = await machineName($)
     current = (await $.store.get('current')) ?? null
     $.clock.every(POLL_MS, () => poll($))
@@ -138,6 +145,15 @@ export function register(on) {
     })
     return Box({ flexDirection: 'column', children: fit(parts, e.props.maxRows ?? 99, e.props.bodyColumns ?? 80) })
   })
+}
+
+// The plugin's own .env (see .env.example). No file, or no such key, keeps the default.
+async function loadConfig($) {
+  try {
+    return configFrom(parseEnv(await $.fs.read($.plugin.root + '/.env')))
+  } catch {
+    return DEFAULT_CONFIG
+  }
 }
 
 async function machineName($) {
@@ -233,7 +249,7 @@ function view(Box, Text, Button, act) {
       }),
   }
   // Asked for, so never dropped to save rows; cut to one line at worst.
-  const extra = open?.id === id ? EXTRAS[open.kind].lines(card, stage, current.quizOk).map((l) => text(l, { italic: true, dimColor: true })) : []
+  const extra = open?.id !== id ? [] : EXTRAS[open.kind].tables ? tables(Box, Text, EXTRAS[open.kind].tables(card)) : EXTRAS[open.kind].lines(card, stage, current.quizOk).map((l) => text(l, { italic: true, dimColor: true }))
   const next = Button({ key: 'next', label: 'próxima', hotkey: '1', plain: true, onPress: () => act.next(id) })
   const note = text('📚 ' + card.note, { dimColor: true }, 1)
 
@@ -266,6 +282,27 @@ function view(Box, Text, Button, act) {
     gap,
     row(ask),
   ]
+}
+
+// Conjugation tables as the morning briefs draw them: a title, then a header of
+// tenses over one row per person. Boxes of fixed width keep the columns aligned
+// in the Desktop app's proportional font too.
+function tables(Box, Text, list) {
+  const parts = []
+  for (const t of list) {
+    parts.push({ text: t.title, drop: 0, make: (cut) => Text({ bold: true, wrap: cut ? 'truncate-end' : 'wrap', children: [t.title] }) })
+    for (const [i, cells] of [t.header, ...t.rows].entries()) {
+      parts.push({
+        node: Box({
+          flexDirection: 'row',
+          children: cells.map((c, j) =>
+            Box({ width: j === 0 ? 10 : 22, children: [Text({ dimColor: i === 0 || j === 0, italic: i === 0, wrap: 'truncate-end', children: [c] })] }),
+          ),
+        }),
+      })
+    }
+  }
+  return parts
 }
 
 // A tree taller than the band scrolls, and then the digit hotkeys stop working.
@@ -558,7 +595,7 @@ async function refill($) {
   let added = 0
   try {
     await sync($)
-    const req = buildRequest({ now, state, queue, activity, total: BATCH })
+    const req = buildRequest({ now, state, queue, activity, total: BATCH, cfg })
     // The lock covers the model call itself, not the sync before it.
     await $.store.set('refill', { ...mine, t: await $.clock.now() })
     const r = await complete($, GENERATE, req)

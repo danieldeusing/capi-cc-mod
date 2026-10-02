@@ -175,16 +175,16 @@ test('an on-demand translation keeps only well-formed German fields', () => {
   )
   assert.deepEqual(parseTranslation('sem json'), {})
   const req = translationRequest(card({ format: 'meaning' }))
-  assert.match(req.system, /keep the item in Portuguese/)
+  assert.match(req.system, /keep the item in Brazilian Portuguese/)
   assert.equal(JSON.parse(req.prompt).item, 'ficar de fora')
   assert.equal(JSON.parse(req.prompt).answer, undefined) // the translator never sees which option is right
 })
 
 test('both prompts translate the taught expression too, except where it is the answer', async () => {
-  const { SYSTEM, TRANSLATE_SYSTEM } = await import('../hooks/lib/cards.js')
-  for (const prompt of [SYSTEM, TRANSLATE_SYSTEM]) {
+  const { systemPrompt, translateSystem } = await import('../hooks/lib/cards.js')
+  for (const prompt of [systemPrompt(), translateSystem()]) {
     assert.match(prompt, /Translate EVERYTHING into German, the expression being taught included/)
-    assert.match(prompt, /in a "meaning" card keep the item in Portuguese/)
+    assert.match(prompt, /in a "meaning" card keep the item in Brazilian Portuguese/)
   }
 })
 
@@ -200,18 +200,41 @@ test('the header labels the category and the level separately', async () => {
   assert.match(headerParts(card(), { ...s, known: 700, level: levelFor(700) }).standing, /^Nível: Brasileiro de coração · 🔥/)
 })
 
-test('grammar and conjugation replies are checked, and never fill a gap', async () => {
+test('grammar and conjugation replies are checked, tables follow the config, and a gap is never filled', async () => {
   const x = await import('../hooks/lib/extras.js')
+  const { DEFAULT_CONFIG: cfg } = await import('../hooks/lib/config.js')
   assert.deepEqual(x.parseGrammar('{"grammarDe":["a","",3,"b"]}'), { grammarDe: ['a', 'b'] })
   assert.deepEqual(x.parseGrammar('nada'), {})
-  const t = (n) => ({ presente: Array(n).fill('x'), 'pretérito perfeito': Array(4).fill('y'), 'pretérito imperfeito': Array(4).fill('z'), futuro: Array(4).fill('w') })
-  const reply = JSON.stringify({ verbs: [{ infinitive: 'ser', tenses: t(4) }, { infinitive: 'ir', tenses: t(3) }] })
-  assert.deepEqual(x.parseConjugation(reply).verbs.map((v) => v.infinitive), ['ser']) // a tense with 3 forms is dropped
-  const lines = x.conjugationLines({ verbs: [{ infinitive: 'ser', de: 'sein', tenses: t(4) }] })
-  assert.deepEqual(lines.slice(0, 3), ['🔤 ' + x.PERSONS, '🔤 ser = sein', '    presente: x · x · x · x'])
+  const tenses = (n) => Object.fromEntries(cfg.tenses.map((t, i) => [t, Array.from({ length: i === 0 ? n : 5 }, (_, k) => t[0] + k)]))
+  const reply = JSON.stringify({ verbs: [{ infinitive: 'ser', de: 'sein', tenses: tenses(5) }, { infinitive: 'ir', tenses: tenses(4) }] })
+  const { verbs } = x.parseConjugation(reply, cfg)
+  assert.deepEqual(verbs.map((v) => v.infinitive), ['ser']) // a tense one person short is dropped
+  const [table] = x.conjugationTables({ verbs }, cfg)
+  assert.equal(table.title, '🔤 ser = sein')
+  assert.deepEqual(table.header, ['', 'presente', 'pretérito perfeito', 'pretérito imperfeito', 'futuro', 'subjuntivo presente'])
+  assert.deepEqual(table.rows.map((r) => r[0]), ['eu', 'você', 'ele/ela', 'nós', 'vocês']) // as the morning briefs: no tu, no vós
+  assert.deepEqual(table.rows[1], ['você', 'p1', 'p1', 'p1', 'f1', 's1'])
   // a cloze card's item is the answer: it never reaches the model, and the prompt forbids filling the gap
   const req = x.conjugationRequest(card({ format: 'cloze', question: 'Se cê ___ no Pantanal' }))
   assert.equal(JSON.parse(req.prompt).item, undefined)
   assert.match(req.system, /never fill it/)
+  assert.match(req.system, /in this order: eu, você, ele\/ela, nós, vocês/)
   assert.match(x.grammarRequest(card()).system, /never fill it/)
+})
+
+test('the settings file is read plainly, and every prompt follows it', async () => {
+  const { parseEnv, configFrom, DEFAULTS } = await import('../hooks/lib/config.js')
+  const { systemPrompt } = await import('../hooks/lib/cards.js')
+  const { conjugationSystem } = await import('../hooks/lib/extras.js')
+  const env = parseEnv('# comment\n\nCAPI_LEARN_LANGUAGE="Mexican Spanish"\nCAPI_NATIVE_LANGUAGE = English \nCAPI_TOPICS=\nCAPI_PERSONS=yo|tú|él/ella|nosotros|ustedes\nnot a pair\n=x\n')
+  assert.deepEqual(env, { CAPI_LEARN_LANGUAGE: 'Mexican Spanish', CAPI_NATIVE_LANGUAGE: 'English', CAPI_TOPICS: '', CAPI_PERSONS: 'yo|tú|él/ella|nosotros|ustedes' })
+  const cfg = configFrom(env)
+  assert.equal(cfg.topics, DEFAULTS.CAPI_TOPICS) // an empty value keeps the default
+  assert.deepEqual(cfg.persons, ['yo', 'tú', 'él/ella', 'nosotros', 'ustedes'])
+  assert.match(systemPrompt(cfg), /teaches Mexican Spanish inside a coding tool/)
+  assert.match(systemPrompt(cfg), /native English speaker/)
+  assert.match(conjugationSystem(cfg), /in this order: yo, tú, él\/ella, nosotros, ustedes/)
+  const s = replay([], T0)
+  const req = buildRequest({ now: T0, state: s, queue: [], activity: [], total: 10, cfg: configFrom({ CAPI_TOPICS: 'football and music' }) })
+  assert.match(req.prompt, /Spread the facts across: football and music\./)
 })

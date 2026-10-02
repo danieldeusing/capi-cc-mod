@@ -1,32 +1,36 @@
 // 📐 grammar notes and 🔤 conjugations for a card's sentence, asked for when
 // the learner opens them and then kept on the card.
 
-const isText = (v) => typeof v === 'string' && v.trim() !== ''
+import { DEFAULT_CONFIG } from './config.js'
 
-export const TENSES = ['presente', 'pretérito perfeito', 'pretérito imperfeito', 'futuro']
-// Brazilian persons, the forms people actually use: tu and vós are left out.
-export const PERSONS = 'eu · você/ele/ela/a gente · nós · vocês/eles/elas'
+const isText = (v) => typeof v === 'string' && v.trim() !== ''
 
 const NO_GIVEAWAY = `If the sentence contains ___, it is a gap the learner must fill: never fill it, never name or hint at the missing word. If the card is a "meaning" card, never explain what the item in «» means.`
 
-export const GRAMMAR_SYSTEM = `You explain the grammar of one Brazilian Portuguese sentence to a German native speaker who lives in Brazil and speaks everyday Portuguese. Reply with ONLY a JSON object: {"grammarDe":["...", "..."]}
-2 to 5 notes in German, each one short line (at most 140 characters), about what is actually in this sentence: prepositions and contractions and the German case they do the job of (e.g. «do caju» = de + o, wie ein Genitiv), pronoun placement, word order, tense and mood choices (subjuntivo!), colloquial forms (tô, cê, pra, a gente). Compare with German where it helps. ${NO_GIVEAWAY}`
+export function grammarSystem(cfg = DEFAULT_CONFIG) {
+  return `You explain the grammar of one ${cfg.learn} sentence to a native ${cfg.native} speaker who ${cfg.learner}. Reply with ONLY a JSON object: {"grammarDe":["...", "..."]}
+2 to 5 notes in ${cfg.native}, each one short line (at most 140 characters), about what is actually in this sentence: prepositions and contractions and the ${cfg.native} case they do the job of (for German, e.g. «do caju» = de + o, wie ein Genitiv), pronoun placement, word order, tense and mood choices (subjunctive!), colloquial forms. Compare with ${cfg.native} where it helps. ${NO_GIVEAWAY}`
+}
 
-export const CONJUGATION_SYSTEM = `You conjugate the verbs of one Brazilian Portuguese sentence for a German learner. Reply with ONLY a JSON object:
-{"verbs":[{"infinitive":"...","de":"German meaning","inSentence":"the form used in the sentence","form":"its tense and person, in Portuguese","tenses":{"presente":["eu","você/ele/ela/a gente","nós","vocês/eles/elas"],"pretérito perfeito":[...],"pretérito imperfeito":[...],"futuro":[...]}}]}
-Every verb in the sentence, auxiliaries included, at most 4, in the order they appear. Each tense lists exactly 4 forms in this person order: eu, você/ele/ela/a gente, nós, vocês/eles/elas. "futuro" is the futuro do presente (farei, fará, …). ${NO_GIVEAWAY}`
+export function conjugationSystem(cfg = DEFAULT_CONFIG) {
+  const persons = cfg.persons.join(', ')
+  const tenses = Object.fromEntries(cfg.tenses.map((t) => [t, cfg.persons.map(() => '…')]))
+  return `You conjugate the verbs of one ${cfg.learn} sentence for a ${cfg.native}-speaking learner. Reply with ONLY a JSON object:
+{"verbs":[{"infinitive":"...","de":"${cfg.native} meaning","inSentence":"the form used in the sentence","form":"its tense and person, in ${cfg.learn}","tenses":${JSON.stringify(tenses)}}]}
+Every verb in the sentence, auxiliaries included, at most 4, in the order they appear. Each tense lists exactly ${cfg.persons.length} forms, one per person, in this order: ${persons}. Use the forms these persons take in everyday ${cfg.learn}. ${NO_GIVEAWAY}`
+}
 
 function cardJson(card) {
   const { format, item, question } = card
   return JSON.stringify({ format, item: format === 'cloze' ? undefined : item, sentence: question })
 }
 
-export function grammarRequest(card) {
-  return { system: GRAMMAR_SYSTEM, prompt: cardJson(card) }
+export function grammarRequest(card, cfg = DEFAULT_CONFIG) {
+  return { system: grammarSystem(cfg), prompt: cardJson(card) }
 }
 
-export function conjugationRequest(card) {
-  return { system: CONJUGATION_SYSTEM, prompt: cardJson(card) }
+export function conjugationRequest(card, cfg = DEFAULT_CONFIG) {
+  return { system: conjugationSystem(cfg), prompt: cardJson(card) }
 }
 
 function jsonObject(text) {
@@ -45,12 +49,18 @@ export function parseGrammar(text) {
   return ok.length ? { grammarDe: ok } : {}
 }
 
-export function parseConjugation(text) {
+// A verb is kept only when every configured tense has one form per person.
+export function fitsTable(v, cfg = DEFAULT_CONFIG) {
+  return (
+    isText(v?.infinitive) &&
+    cfg.tenses.every((t) => Array.isArray(v.tenses?.[t]) && v.tenses[t].length === cfg.persons.length && v.tenses[t].every(isText))
+  )
+}
+
+export function parseConjugation(text, cfg = DEFAULT_CONFIG) {
   const verbs = jsonObject(text)?.verbs
   if (!Array.isArray(verbs)) return {}
-  const ok = verbs
-    .filter((v) => isText(v?.infinitive) && v.tenses && TENSES.every((t) => Array.isArray(v.tenses[t]) && v.tenses[t].length === 4 && v.tenses[t].every(isText)))
-    .slice(0, 4)
+  const ok = verbs.filter((v) => fitsTable(v, cfg)).slice(0, 4)
   return ok.length ? { verbs: ok } : {}
 }
 
@@ -58,13 +68,14 @@ export function grammarLines(card) {
   return (card.grammarDe ?? []).map((n) => '📐 ' + n)
 }
 
-export function conjugationLines(card) {
-  if (!card.verbs?.length) return []
-  const lines = ['🔤 ' + PERSONS]
-  for (const v of card.verbs) {
-    const where = isText(v.inSentence) ? ` · im Satz: ${v.inSentence}${isText(v.form) ? ` (${v.form})` : ''}` : ''
-    lines.push(`🔤 ${v.infinitive}${isText(v.de) ? ` = ${v.de}` : ''}${where}`)
-    for (const t of TENSES) lines.push(`    ${t}: ${v.tenses[t].join(' · ')}`)
-  }
-  return lines
+// One table per verb, the way the morning briefs draw it: a title line, then a
+// header row of tenses and one row per person.
+export function conjugationTables(card, cfg = DEFAULT_CONFIG) {
+  return (card.verbs ?? [])
+    .filter((v) => fitsTable(v, cfg))
+    .map((v) => ({
+      title: `🔤 ${v.infinitive}${isText(v.de) ? ` = ${v.de}` : ''}${isText(v.inSentence) ? ` · im Satz: ${v.inSentence}${isText(v.form) ? ` (${v.form})` : ''}` : ''}`,
+      header: ['', ...cfg.tenses],
+      rows: cfg.persons.map((p, i) => [p, ...cfg.tenses.map((t) => v.tenses[t][i])]),
+    }))
 }
