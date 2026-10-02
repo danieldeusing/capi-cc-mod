@@ -159,7 +159,21 @@ function view(Box, Text, Button, act) {
   }
   const { card, stage } = current
   const id = card.id
-  const row = (children) => node(Box({ flexDirection: 'row', columnGap: 3, children }))
+  // Answers on the left; 🔊, 🚩 and 🇩🇪 always on the right, in that order.
+  const row = (children) =>
+    node(
+      Box({
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        children: [
+          Box({ flexDirection: 'row', columnGap: 3, children }),
+          Box({ flexDirection: 'row', columnGap: 3, children: [...tools, deButton] }),
+        ],
+      }),
+    )
+  // A blank line under the header and above the buttons; both go first when
+  // the band is short.
+  const gap = { text: '', drop: 1, make: () => Text({ children: [' '] }) }
   const flagLabel = current.flagged ? '🚩 marcado' : armed?.id === id ? '🚩 de novo = confirmar' : '🚩 tá errado?'
   const tools = [
     Button({ key: 'speak', label: '🔊 ouvir', hotkey: '8', plain: true, onPress: act.speak }),
@@ -167,20 +181,20 @@ function view(Box, Text, Button, act) {
   ]
   const german = germanLines(card, stage, current.quizOk)
   const deLabel = translating === id ? '🇩🇪 traduzindo…' : translated === id ? '🇩🇪 esconder' : '🇩🇪 tradução'
-  tools.unshift(Button({ key: 'de', label: deLabel, hotkey: '7', plain: true, onPress: () => act.translate(id) }))
+  const deButton = Button({ key: 'de', label: deLabel, hotkey: '0', plain: true, onPress: () => act.translate(id) })
   // Asked for, so never dropped to save rows; cut to one line at worst.
   const de = translated === id ? german.map((l) => text('🇩🇪 ' + l, { italic: true, dimColor: true })) : []
   const next = Button({ key: 'next', label: 'próxima', hotkey: '1', plain: true, onPress: () => act.next(id) })
   const note = text('📚 ' + card.note, { dimColor: true }, 1)
 
   if (card.format === 'bonus') {
-    return [head, text(ASK.bonus, { bold: true }), text(card.question), text(card.explain), ...de, note, row([next, ...tools])]
+    return [head, gap, text(ASK.bonus, { bold: true }), text(card.question), text(card.explain), ...de, note, gap, row([next])]
   }
   if (stage === 'quiz') {
     const options = card.options.map((o, i) =>
       Button({ key: 'opt-' + i, label: o, hotkey: String(i + 1), plain: true, onPress: () => act.pick(id, i) }),
     )
-    return [head, text('❓ ' + ASK[card.format], { bold: true }), text(card.question), ...de, row([...options, ...tools])]
+    return [head, gap, text('❓ ' + ASK[card.format], { bold: true }), text(card.question), ...de, gap, row(options)]
   }
   const verdict = current.quizOk
     ? `✅ Certo! +${current.gain} · ${card.capiRight}`
@@ -194,11 +208,13 @@ function view(Box, Text, Button, act) {
       ]
   return [
     head,
+    gap,
     text(verdict, { color: current.quizOk ? 'green' : 'red' }),
     text(`${card.explain} (Fonte: ${card.source})`),
     ...de,
     note,
-    row([...ask, ...tools]),
+    gap,
+    row(ask),
   ]
 }
 

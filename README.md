@@ -10,7 +10,7 @@ prompt) or by clicking.
 | --- | --- |
 | `1`–`4` | answer the quiz, then `sim`/`não`: did you know the expression? |
 | `8` | 🔊 hear it (macOS voice *Luciana*) |
-| `7` | 🇩🇪 show or hide the German translation of the card |
+| `0` | 🇩🇪 show or hide the German translation of the card (always at the right) |
 | `9`, then `9` again | 🚩 the fact is wrong: it is never used again, and Capi re-checks it |
 
 `/ptbr` shows level, streak, points, what is due, and how the last sync and card

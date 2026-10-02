@@ -179,3 +179,11 @@ test('an on-demand translation keeps only well-formed German fields', () => {
   assert.equal(JSON.parse(req.prompt).item, 'ficar de fora')
   assert.equal(JSON.parse(req.prompt).answer, undefined) // the translator never sees which option is right
 })
+
+test('both prompts translate the taught expression too, except where it is the answer', async () => {
+  const { SYSTEM, TRANSLATE_SYSTEM } = await import('../hooks/lib/cards.js')
+  for (const prompt of [SYSTEM, TRANSLATE_SYSTEM]) {
+    assert.match(prompt, /Translate EVERYTHING into German, the expression being taught included/)
+    assert.match(prompt, /in a "meaning" card keep the item in Portuguese/)
+  }
+})

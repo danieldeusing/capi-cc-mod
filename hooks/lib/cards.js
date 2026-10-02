@@ -49,7 +49,7 @@ Formats:
 - "meaning": the sentence, then which German meaning the item has; 3 or 4 German options.
 - "bonus": no quiz. A Brazilian proverb, an idiom with its story, or a word with a surprising origin. kind "bonus", options [], answer -1, item may be "".
 
-Translations, so the learner can check what he read: "questionDe" is the question in German, "explainDe" the explanation in German, "capiRightDe" and "capiWrongDe" Capi's lines in German. "optionsDe" is the options in German, same order, for "mc" cards only; [] for every other format. Never let a translation give the answer away: in a "meaning" card keep the item in Portuguese inside «», and in a "cloze" card keep the ___.
+Translations, so the learner can check what he read: "questionDe" is the question in German, "explainDe" the explanation in German, "capiRightDe" and "capiWrongDe" Capi's lines in German. "optionsDe" is the options in German, same order, for "mc" cards only; [] for every other format. Translate EVERYTHING into German, the expression being taught included, so the learner sees what it means (write "Schau mal: …" for "Saca só: …", never leave it in Portuguese). Two exceptions, so a translation never gives the answer away: in a "meaning" card keep the item in Portuguese inside «», because its meaning is the answer, and in a "cloze" card keep the ___.
 
 Tone: playful, warm, a bit cheeky. "capiRight" and "capiWrong" are Capi's Portuguese one-liners of at most 12 words, funny and never mean.
 
@@ -160,7 +160,7 @@ export function germanLines(card, stage, quizOk) {
 // learner opens 🇩🇪 on it, under the same rules the card batches follow.
 export const TRANSLATE_SYSTEM = `Translate one Brazilian Portuguese quiz card into German for a learner. Reply with ONLY a JSON object:
 {"questionDe":"...","optionsDe":[],"explainDe":"...","capiRightDe":"...","capiWrongDe":"..."}
-"optionsDe" holds the options in German, same order, for an "mc" card only; [] otherwise. Never let a translation give the answer away: in a "meaning" card keep the item in Portuguese inside «», and in a "cloze" card keep the ___. Leave out a field the card does not have.`
+"optionsDe" holds the options in German, same order, for an "mc" card only; [] otherwise. Translate EVERYTHING into German, the expression being taught included, so the learner sees what it means (write "Schau mal: …" for "Saca só: …", never leave it in Portuguese). Two exceptions, so a translation never gives the answer away: in a "meaning" card keep the item in Portuguese inside «», because its meaning is the answer, and in a "cloze" card keep the ___. Leave out a field the card does not have.`
 
 export function translationRequest(card) {
   const { format, item, question, options, explain, capiRight, capiWrong } = card

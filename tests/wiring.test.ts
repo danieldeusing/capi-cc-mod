@@ -262,3 +262,20 @@ test('a translation that fails says so and closes again', async ($, on) => {
   expect(toasts.some((t) => t.includes('não conseguiu traduzir'))).toBe(true)
   expect(await ui.find({ key: 'de' })).toMatchObject({ props: { label: '🇩🇪 tradução' } })
 })
+
+test('blank lines frame the question, answers sit left and 🔊 🚩 🇩🇪 right, 🇩🇪 on key 0', async ($, on) => {
+  const { clock } = engine(on, [reply(five())])
+  await start($, clock)
+  for (const surface of ['terminal', 'desktop'] as const) {
+    const ui = await $.ui.mount({ ...BAND, surface })
+    const root0 = (await ui.find({ type: 'Box' })) as any
+    const blanks = root0.children.map((c: any, i: number) => (c.type === 'Text' && c.children?.[0] === ' ' ? i : -1)).filter((i: number) => i >= 0)
+    expect(blanks).toEqual([1, root0.children.length - 2]) // under the header, above the buttons
+    expect(await ui.find({ key: 'de' })).toMatchObject({ props: { hotkey: '0' } })
+    const bar = root0.children[root0.children.length - 1]
+    expect(bar.props.justifyContent).toBe('space-between')
+    expect(bar.children[0].children.map((c: any) => c.props.key)).toEqual(['opt-0', 'opt-1'])
+    expect(bar.children[1].children.map((c: any) => c.props.key)).toEqual(['speak', 'flag', 'de'])
+    await ui.unmount()
+  }
+})
