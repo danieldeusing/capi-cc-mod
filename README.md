@@ -62,6 +62,7 @@ For one session only: `claude --plugin-dir ~/Work/danieldeusing/dd-ptbr-mod`.
 
 ```bash
 node --test test/                 # the learning logic, no Claude Code needed
+claude plugin test                # the wiring, in Claude Code's own test kit
 claude plugin validate . --strict # what Claude Code reads from the mod
 ```
 
