@@ -1,4 +1,6 @@
 // The learning logic, outside Claude Code: node --test test/
+// Days and month files follow local time, so the tests pin one: Brazil's.
+process.env.TZ = 'America/Sao_Paulo'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { replay, dueItems, newAllowance, levelFor, PLACEMENT_BOX, NEW_PER_DAY } from '../hooks/lib/srs.js'
