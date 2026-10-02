@@ -225,6 +225,8 @@ test('– folds the band to its header line, □ opens it again, and a new sessi
   expect(await ui.find({ key: 'size' })).toMatchObject({ props: { label: '–', dimColor: true } })
   expect(await ui.find({ key: 'close' })).toMatchObject({ props: { label: '×', dimColor: true } })
   expect(((await ui.find({ key: 'size' })) as any).props.hotkey).toBeUndefined()
+  const header = ((await ui.find({ type: 'Box' })) as any).children[0]
+  expect(header.children[1].children[0].props.columnGap).toBe(1) // – and × sit close together
   expect(await ui.find({ type: 'Svg' })).toBeUndefined() // text, no drawings
   await ui.press({ key: 'size' })
   const folded = (await ui.find({ type: 'Box' })) as any

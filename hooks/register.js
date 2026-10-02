@@ -245,7 +245,7 @@ function view(Box, Text, Button, cols, act) {
   const control = (key, label, onPress) => Button({ key, label, plain: true, dimColor: true, onPress })
   const controls = Box({
     flexDirection: 'row',
-    columnGap: GAP,
+    columnGap: 1, // a pair, closer than the GAP between unrelated things
     children: [
       control('size', minimized ? '□' : '–', act.size),
       control('close', '×', act.close),
