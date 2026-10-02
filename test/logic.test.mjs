@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { replay, dueItems, newAllowance, levelFor, PLACEMENT_BOX, NEW_PER_DAY } from '../hooks/lib/srs.js'
 import { parseJsonl, toJsonl, merge, monthFile } from '../hooks/lib/log.js'
-import { buildRequest, parseCards, activityHint, germanLines } from '../hooks/lib/cards.js'
+import { buildRequest, parseCards, activityHint, germanLines, parseTranslation, translationRequest } from '../hooks/lib/cards.js'
 
 const MIN = 60_000
 const DAY = 86_400_000
@@ -166,4 +166,16 @@ test('the translation toggle shows the question first, then the explanation', ()
   const bonus = { format: 'bonus', questionDe: 'Warum…', explainDe: 'Weil…' }
   assert.deepEqual(germanLines(bonus, 'quiz'), ['Warum…', 'Weil…'])
   assert.deepEqual(germanLines(card(), 'quiz'), []) // a card from before translations
+})
+
+test('an on-demand translation keeps only well-formed German fields', () => {
+  assert.deepEqual(
+    parseTranslation('Aqui: {"questionDe":"Frage?","optionsDe":["a",2],"explainDe":"","capiRightDe":"Gut!","extra":"x"}'),
+    { questionDe: 'Frage?', capiRightDe: 'Gut!' },
+  )
+  assert.deepEqual(parseTranslation('sem json'), {})
+  const req = translationRequest(card({ format: 'meaning' }))
+  assert.match(req.system, /keep the item in Portuguese/)
+  assert.equal(JSON.parse(req.prompt).item, 'ficar de fora')
+  assert.equal(JSON.parse(req.prompt).answer, undefined) // the translator never sees which option is right
 })

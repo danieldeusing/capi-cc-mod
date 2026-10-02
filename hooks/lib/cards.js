@@ -155,3 +155,29 @@ export function germanLines(card, stage, quizOk) {
   if (card.format === 'bonus' || stage === 'reveal') lines.push(card.explainDe)
   return lines.filter(isText)
 }
+
+// For a card made before translations existed: one small request when the
+// learner opens 🇩🇪 on it, under the same rules the card batches follow.
+export const TRANSLATE_SYSTEM = `Translate one Brazilian Portuguese quiz card into German for a learner. Reply with ONLY a JSON object:
+{"questionDe":"...","optionsDe":[],"explainDe":"...","capiRightDe":"...","capiWrongDe":"..."}
+"optionsDe" holds the options in German, same order, for an "mc" card only; [] otherwise. Never let a translation give the answer away: in a "meaning" card keep the item in Portuguese inside «», and in a "cloze" card keep the ___. Leave out a field the card does not have.`
+
+export function translationRequest(card) {
+  const { format, item, question, options, explain, capiRight, capiWrong } = card
+  return { system: TRANSLATE_SYSTEM, prompt: JSON.stringify({ format, item, question, options, explain, capiRight, capiWrong }) }
+}
+
+// The German fields of a reply, only those that are well formed.
+export function parseTranslation(text) {
+  const s = String(text ?? '')
+  let raw = null
+  try {
+    raw = JSON.parse(s.slice(s.indexOf('{'), s.lastIndexOf('}') + 1))
+  } catch {
+    return {}
+  }
+  const out = {}
+  for (const k of ['questionDe', 'explainDe', 'capiRightDe', 'capiWrongDe']) if (isText(raw?.[k])) out[k] = raw[k]
+  if (Array.isArray(raw?.optionsDe) && raw.optionsDe.every(isText)) out.optionsDe = raw.optionsDe
+  return out
+}

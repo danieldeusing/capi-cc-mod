@@ -36,6 +36,7 @@ function engine(on: any, replies: unknown[], files = new Map<string, string>(), 
   const model: any[] = []
   const logs: string[] = []
   const writes: string[] = []
+  const toasts: string[] = []
   const clock = mock.clock(on, { now: T0 })
   const list = (path: string) =>
     [...files.keys()]
@@ -64,7 +65,7 @@ function engine(on: any, replies: unknown[], files = new Map<string, string>(), 
   })
   on('command.register', () => ({ value: undefined }))
   on('ui.log', ($: any, e: any) => (logs.push(e.text), { value: undefined }))
-  on('ui.toast', () => ({ value: undefined }))
+  on('ui.toast', ($: any, e: any) => (toasts.push(e.text), { value: undefined }))
   on('model.complete', ($: any, e: any) => {
     model.push(e)
     return { value: replies.shift() ?? { isAnswered: false, reason: 'api-error' } }
@@ -73,7 +74,7 @@ function engine(on: any, replies: unknown[], files = new Map<string, string>(), 
   on('turn.start', ($: any, e: any) => ({ turnId: e.turnId }))
   on('turn.complete', () => ({ text: '' }))
   on('ui.render', () => ({ type: 'Text', props: {}, children: ['engine'] }))
-  return { store, files, model, logs, writes, clock }
+  return { store, files, model, logs, writes, toasts, clock }
 }
 
 const BAND = {
@@ -236,9 +237,28 @@ test('🇩🇪 opens the translation under the card and closes it again', async 
   expect(await ui.find({ type: 'Text', text: /🇩🇪 Stimmt: 10 Nachbarn/ })).toBeDefined()
 })
 
-test('a card made before translations has no 🇩🇪 button', async ($, on) => {
-  const { clock } = engine(on, [reply(five())])
+test('🇩🇪 on a card made before translations translates it once, and every session sees it', async ($, on) => {
+  const de = { questionDe: 'Nur Chile und Ecuador grenzen nicht an Brasilien.', optionsDe: [], explainDe: 'Stimmt.', capiRightDe: 'Gut!', capiWrongDe: 'Fast!' }
+  const { model, store, clock } = engine(on, [reply(five()), { ...reply([]), text: JSON.stringify(de) }])
+  await start($, clock)
+  const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
+  await ui.press({ key: 'de' })
+  expect(model.length).toBe(2)
+  expect(model[1]).toMatchObject({ model: 'claude-opus-5-5', effort: 'low' })
+  expect(await ui.find({ type: 'Text', text: /🇩🇪 Nur Chile und Ecuador/ })).toBeDefined()
+  expect((store.get('current') as any).card.questionDe).toBe(de.questionDe)
+  // closing and opening again costs nothing
+  await ui.press({ key: 'de' })
+  await ui.press({ key: 'de' })
+  expect(model.length).toBe(2)
+})
+
+test('a translation that fails says so and closes again', async ($, on) => {
+  const { model, toasts, clock } = engine(on, [reply(five())])
   await start($, clock)
   const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
-  expect(await ui.find({ key: 'de' })).toBeUndefined()
+  await ui.press({ key: 'de' })
+  expect(model.length).toBe(2)
+  expect(toasts.some((t) => t.includes('não conseguiu traduzir'))).toBe(true)
+  expect(await ui.find({ key: 'de' })).toMatchObject({ props: { label: '🇩🇪 tradução' } })
 })

@@ -8,13 +8,15 @@
 
 import { replay, dayOf } from './lib/srs.js'
 import { parseJsonl, toJsonl, merge, monthFile } from './lib/log.js'
-import { buildRequest, parseCards, activityHint, germanLines, ITEM_FORMATS } from './lib/cards.js'
+import { buildRequest, parseCards, activityHint, germanLines, translationRequest, parseTranslation, ITEM_FORMATS } from './lib/cards.js'
 
 // The facts have to be TRUE, so batches go to Opus at high effort. They run in
 // the background while cards are still queued, so the latency costs nothing.
 const GENERATE = { model: 'claude-opus-5-5', effort: 'high', maxTokens: 32000, timeoutMs: 300_000 }
 // A 🚩 asks whether one claim really is wrong: rare, and worth the most care.
 const CHECK = { model: 'claude-opus-5-5', effort: 'xhigh', maxTokens: 2000, timeoutMs: 300_000 }
+// Translating one older card on demand: a small, plain job.
+const TRANSLATE = { model: 'claude-opus-5-5', effort: 'low', maxTokens: 1500, timeoutMs: 60_000 }
 const BATCH = 10
 const REFILL_BELOW = 4
 const POLL_MS = 3000
@@ -52,6 +54,7 @@ let syncTimer = null
 let armed = null
 // The card whose German translation is open in this session, if any.
 let translated = null
+let translating = null
 let syncReport = 'not synced yet'
 let lastBatch = 'none yet'
 let failure = ''
@@ -109,10 +112,7 @@ export function register(on) {
       next: (id) => nextCard($, id),
       speak: () => speak($),
       flag: (id) => flag($, id),
-      translate: (id) => {
-        translated = translated === id ? null : id
-        $.ui.invalidate('ui.render')
-      },
+      translate: (id) => toggleTranslation($, id),
     })
     return Box({ flexDirection: 'column', children: fit(parts, e.props.maxRows ?? 99, e.props.bodyColumns ?? 80) })
   })
@@ -166,12 +166,8 @@ function view(Box, Text, Button, act) {
     Button({ key: 'flag', label: flagLabel, hotkey: '9', plain: true, dimColor: Boolean(current.flagged), onPress: () => act.flag(id) }),
   ]
   const german = germanLines(card, stage, current.quizOk)
-  if (german.length || translated === id) {
-    const open = translated === id
-    tools.unshift(
-      Button({ key: 'de', label: open ? '🇩🇪 esconder' : '🇩🇪 tradução', hotkey: '7', plain: true, onPress: () => act.translate(id) }),
-    )
-  }
+  const deLabel = translating === id ? '🇩🇪 traduzindo…' : translated === id ? '🇩🇪 esconder' : '🇩🇪 tradução'
+  tools.unshift(Button({ key: 'de', label: deLabel, hotkey: '7', plain: true, onPress: () => act.translate(id) }))
   // Asked for, so never dropped to save rows; cut to one line at worst.
   const de = translated === id ? german.map((l) => text('🇩🇪 ' + l, { italic: true, dimColor: true })) : []
   const next = Button({ key: 'next', label: 'próxima', hotkey: '1', plain: true, onPress: () => act.next(id) })
@@ -215,6 +211,34 @@ function fit(parts, maxRows, cols) {
   for (const level of [1, 2]) if (height(keep, false) > maxRows) keep = keep.filter((p) => p.drop !== level)
   const cut = height(keep, false) > maxRows
   return keep.map((p) => (p.make ? p.make(cut) : p.node))
+}
+
+// Opens or closes the German lines. A card made before translations existed
+// is translated on the first open, and the result is kept on the shared card.
+async function toggleTranslation($, id) {
+  if (!current || current.card.id !== id) return
+  translated = translated === id ? null : id
+  $.ui.invalidate('ui.render')
+  const card = current.card
+  if (translated !== id || translating === id || card.questionDe || card.explainDe) return
+  translating = id
+  $.ui.invalidate('ui.render')
+  const r = await complete($, TRANSLATE, translationRequest(card))
+  translating = null
+  const fields = r.ok ? parseTranslation(r.text) : {}
+  if (Object.keys(fields).length === 0) {
+    if (translated === id) translated = null
+    $.ui.toast(`Capi não conseguiu traduzir (${r.ok ? 'resposta sem tradução' : r.reason})`)
+  } else {
+    const shared = (await $.store.get('current')) ?? null
+    if (shared?.card.id === id) {
+      current = { ...shared, card: { ...shared.card, ...fields } }
+      await $.store.set('current', current)
+    } else if (current?.card.id === id) {
+      current = { ...current, card: { ...current.card, ...fields } }
+    }
+  }
+  $.ui.invalidate('ui.render')
 }
 
 // ---- answering -------------------------------------------------------------
@@ -530,7 +554,7 @@ async function complete($, opts, req) {
 // Follows the card another session moved to, and keeps cards coming.
 async function poll($) {
   const shared = (await $.store.get('current')) ?? null
-  const key = (c) => (c ? `${c.card.id}:${c.stage}:${c.flagged ? 1 : 0}` : '')
+  const key = (c) => (c ? `${c.card.id}:${c.stage}:${c.flagged ? 1 : 0}:${c.card.questionDe ? 1 : 0}` : '')
   if (key(shared) !== key(current)) {
     current = shared
     $.ui.invalidate('ui.render')

@@ -36,6 +36,7 @@ Every model call uses `claude-opus-5-5` on your plan:
 | --- | --- | --- |
 | ten new cards | `high` | when fewer than 4 cards are queued; cards leave the queue only when answered |
 | 🚩 re-check | `xhigh` | once per flag |
+| 🇩🇪 for an older card | `low` | once per card, when 🇩🇪 is first pressed on a card made without translations |
 
 Change them at the top of `hooks/register.js` (`GENERATE`, `CHECK`).
 
