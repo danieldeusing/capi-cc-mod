@@ -285,6 +285,11 @@ test('📐 🔤 🇩🇪 sit top right, 🇩🇪 on key 0, 🔊 🚩 bottom righ
     const words = (box: any): string[] => (box.children ?? []).flatMap((c: any) => (typeof c === 'string' ? [c] : words(c)))
     expect(words(header.children[0])).toEqual(['🦫', 'categoria', 'brasil', 'tipo', 'Fala', 'pergunta', 'Verdade ou mentira', 'nível', 'Turista 0/50', 'sequência', '0 dias', 'combo', '0'])
     expect(words(root0.children[0]).join(' ')).not.toMatch(/[·│|]/) // one structure: no separators
+    // labels dim, every value and the question at full strength, the question bold
+    const values = header.children[0].children.slice(1).map((p: any) => p.children[1].props)
+    expect(values.every((v: any) => !v.dimColor)).toBe(true)
+    expect(header.children[0].children.slice(1).every((p: any) => p.children[0].props.dimColor)).toBe(true)
+    expect(root0.children[2].props.bold).toBe(true) // the question, under the blank line
     // the question type lives in the header now, not above the question
     expect(await ui.find({ type: 'Text', text: /Verdade ou mentira\?/ })).toBeUndefined()
     await ui.unmount()

@@ -187,11 +187,11 @@ function view(Box, Text, Button, act) {
   })
   const node = (n) => ({ node: n })
   // One line of label and value pairs, labels dim, set apart by space alone:
-  // the card (categoria, tipo, pergunta), then the learner, dimmed. 📐 🔤 🇩🇪
+  // the card (categoria, tipo, pergunta), then the learner. 📐 🔤 🇩🇪
   // sit at its right end and never shrink; the values give way first.
   const { card: cardPairs, learner } = headerParts(current?.card, s)
-  const pair = ([k, v], dim) =>
-    Box({ flexDirection: 'row', columnGap: 1, flexShrink: 1, children: [Text({ dimColor: true, children: [k] }), Text({ dimColor: dim, wrap: 'truncate-end', children: [v] })] })
+  const pair = ([k, v]) =>
+    Box({ flexDirection: 'row', columnGap: 1, flexShrink: 1, children: [Text({ dimColor: true, children: [k] }), Text({ wrap: 'truncate-end', children: [v] })] })
   const head = {
     text: '', // always one row
     drop: 0,
@@ -205,7 +205,7 @@ function view(Box, Text, Button, act) {
             flexDirection: 'row',
             columnGap: GAP,
             flexShrink: 1,
-            children: [Text({ children: ['🦫'] }), ...cardPairs.map((p) => pair(p, false)), ...learner.map((p) => pair(p, true))],
+            children: [Text({ children: ['🦫'] }), ...[...cardPairs, ...learner].map(pair)],
           }),
           ...(side ? [Box({ flexShrink: 0, children: [side] })] : []),
         ],
@@ -265,13 +265,13 @@ function view(Box, Text, Button, act) {
   const note = text('📚 ' + card.note, { dimColor: true }, 1)
 
   if (card.format === 'bonus') {
-    return [top, gap, text(card.question), text(card.explain), ...panel, note, gap, row([next])]
+    return [top, gap, text(card.question, { bold: true }), text(card.explain), ...panel, note, gap, row([next])]
   }
   if (stage === 'quiz') {
     const options = card.options.map((o, i) =>
       Button({ key: 'opt-' + i, label: o, hotkey: String(i + 1), plain: true, onPress: () => act.pick(id, i) }),
     )
-    return [top, gap, text(card.question), ...(extra.length ? [gap, ...extra] : []), gap, row(options)]
+    return [top, gap, text(card.question, { bold: true }), ...(extra.length ? [gap, ...extra] : []), gap, row(options)]
   }
   const verdict = current.quizOk
     ? `✅ Certo! +${current.gain} · ${card.capiRight}`
