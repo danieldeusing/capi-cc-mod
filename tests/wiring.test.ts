@@ -259,11 +259,11 @@ test('a translation that fails says so and closes again', async ($, on) => {
   const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
   await ui.press({ key: 'de' })
   expect(model.length).toBe(2)
-  expect(toasts.some((t) => t.includes('não conseguiu traduzir'))).toBe(true)
+  expect(toasts.some((t) => t.includes('não conseguiu (tradução'))).toBe(true)
   expect(await ui.find({ key: 'de' })).toMatchObject({ props: { label: '🇩🇪 tradução' } })
 })
 
-test('🇩🇪 sits top right on key 0, 🔊 🚩 bottom right beside the answers, blank lines frame the question', async ($, on) => {
+test('📐 🔤 🇩🇪 sit top right, 🇩🇪 on key 0, 🔊 🚩 bottom right beside the answers, blank lines frame the question', async ($, on) => {
   const { clock } = engine(on, [reply(five())])
   await start($, clock)
   for (const surface of ['terminal', 'desktop'] as const) {
@@ -278,10 +278,37 @@ test('🇩🇪 sits top right on key 0, 🔊 🚩 bottom right beside the answer
     expect(bar.children[1].children.map((c: any) => c.props.key)).toEqual(['speak', 'flag'])
     const header = root0.children[0]
     expect(header.props.justifyContent).toBe('space-between')
-    expect(header.children[1].props.key).toBe('de')
+    expect(header.children[1].children.map((c: any) => c.props.key)).toEqual(['gram', 'conj', 'de'])
     const halves = header.children[0].children
     expect(halves.map((c: any) => c.children[0])).toEqual(['🦫', 'Categoria: 🗣️ Fala · brasil', '│', 'Nível: Turista 0/50 · 🔥 0 dias · combo x0'])
     expect(halves[1].props.bold).toBe(true)
     await ui.unmount()
   }
+})
+
+test('📐 and 🔤 are generated once each, at their effort, and only one panel is open at a time', async ($, on) => {
+  const grammar = { grammarDe: ['«do caju» = de + o, wie ein Genitiv: der Teil DES Cashews.', '«saca só» ist Umgangssprache.'] }
+  const forms = (a: string) => [a + '1', a + '2', a + '3', a + '4']
+  const verbs = { verbs: [{ infinitive: 'ser', de: 'sein', inSentence: 'é', form: 'presente, ele', tenses: { presente: forms('sou'), 'pretérito perfeito': forms('fui'), 'pretérito imperfeito': forms('era'), futuro: forms('serei') } }] }
+  const text = (o: unknown) => ({ ...reply([]), text: JSON.stringify(o) })
+  const { model, store, clock } = engine(on, [reply(five()), text(grammar), text(verbs)])
+  await start($, clock)
+  const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
+
+  await ui.press({ key: 'gram' })
+  expect(model[1]).toMatchObject({ effort: 'medium' })
+  expect(await ui.find({ type: 'Text', text: /📐 «do caju» = de \+ o/ })).toBeDefined()
+
+  await ui.press({ key: 'conj' })
+  expect(model[2]).toMatchObject({ effort: 'low' })
+  expect(await ui.find({ type: 'Text', text: /🔤 ser = sein · im Satz: é \(presente, ele\)/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /presente: sou1 · sou2 · sou3 · sou4/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /📐/ })).toBeUndefined() // grammar closed when conjugation opened
+
+  await ui.press({ key: 'gram' }) // back to grammar: kept, no new call
+  expect(model.length).toBe(3)
+  expect(await ui.find({ type: 'Text', text: /📐 «do caju»/ })).toBeDefined()
+  const kept = (store.get('current') as any).card
+  expect(kept.grammarDe.length).toBe(2)
+  expect(kept.verbs[0].infinitive).toBe('ser')
 })

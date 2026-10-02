@@ -199,3 +199,19 @@ test('the header labels the category and the level separately', async () => {
   assert.equal(headerParts(null, s).category, null)
   assert.match(headerParts(card(), { ...s, known: 700, level: levelFor(700) }).standing, /^Nível: Brasileiro de coração · 🔥/)
 })
+
+test('grammar and conjugation replies are checked, and never fill a gap', async () => {
+  const x = await import('../hooks/lib/extras.js')
+  assert.deepEqual(x.parseGrammar('{"grammarDe":["a","",3,"b"]}'), { grammarDe: ['a', 'b'] })
+  assert.deepEqual(x.parseGrammar('nada'), {})
+  const t = (n) => ({ presente: Array(n).fill('x'), 'pretérito perfeito': Array(4).fill('y'), 'pretérito imperfeito': Array(4).fill('z'), futuro: Array(4).fill('w') })
+  const reply = JSON.stringify({ verbs: [{ infinitive: 'ser', tenses: t(4) }, { infinitive: 'ir', tenses: t(3) }] })
+  assert.deepEqual(x.parseConjugation(reply).verbs.map((v) => v.infinitive), ['ser']) // a tense with 3 forms is dropped
+  const lines = x.conjugationLines({ verbs: [{ infinitive: 'ser', de: 'sein', tenses: t(4) }] })
+  assert.deepEqual(lines.slice(0, 3), ['🔤 ' + x.PERSONS, '🔤 ser = sein', '    presente: x · x · x · x'])
+  // a cloze card's item is the answer: it never reaches the model, and the prompt forbids filling the gap
+  const req = x.conjugationRequest(card({ format: 'cloze', question: 'Se cê ___ no Pantanal' }))
+  assert.equal(JSON.parse(req.prompt).item, undefined)
+  assert.match(req.system, /never fill it/)
+  assert.match(x.grammarRequest(card()).system, /never fill it/)
+})

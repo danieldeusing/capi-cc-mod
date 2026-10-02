@@ -10,7 +10,9 @@ prompt) or by clicking.
 | --- | --- |
 | `1`–`4` | answer the quiz, then `sim`/`não`: did you know the expression? |
 | `8` | 🔊 hear it (macOS voice *Luciana*) |
-| `0` | 🇩🇪 show or hide the German translation of the card (top right) |
+| `6` | 📐 grammar notes in German: contractions and the German case they do the job of, word order, mood, colloquial forms |
+| `7` | 🔤 every verb in the sentence: present, perfect, imperfect and future, all persons |
+| `0` | 🇩🇪 the German translation of the card |
 | `9`, then `9` again | 🚩 the fact is wrong: it is never used again, and Capi re-checks it |
 
 `/ptbr` shows level, streak, points, what is due, and how the last sync and card
@@ -37,6 +39,8 @@ Every model call uses `claude-opus-5-5` on your plan:
 | ten new cards | `high` | when fewer than 4 cards are queued; cards leave the queue only when answered |
 | 🚩 re-check | `xhigh` | once per flag |
 | 🇩🇪 for an older card | `low` | once per card, when 🇩🇪 is first pressed on a card made without translations |
+| 📐 grammar notes | `medium` | once per card, when 📐 is first pressed |
+| 🔤 conjugations | `low` | once per card, when 🔤 is first pressed |
 
 Change them at the top of `hooks/register.js` (`GENERATE`, `CHECK`).
 

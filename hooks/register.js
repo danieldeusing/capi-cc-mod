@@ -9,14 +9,36 @@
 import { replay, dayOf } from './lib/srs.js'
 import { parseJsonl, toJsonl, merge, monthFile } from './lib/log.js'
 import { buildRequest, parseCards, activityHint, germanLines, headerParts, translationRequest, parseTranslation, ITEM_FORMATS } from './lib/cards.js'
+import { grammarRequest, parseGrammar, grammarLines, conjugationRequest, parseConjugation, conjugationLines } from './lib/extras.js'
 
 // The facts have to be TRUE, so batches go to Opus at high effort. They run in
 // the background while cards are still queued, so the latency costs nothing.
 const GENERATE = { model: 'claude-opus-5-5', effort: 'high', maxTokens: 32000, timeoutMs: 300_000 }
 // A 🚩 asks whether one claim really is wrong: rare, and worth the most care.
 const CHECK = { model: 'claude-opus-5-5', effort: 'xhigh', maxTokens: 2000, timeoutMs: 300_000 }
-// Translating one older card on demand: a small, plain job.
-const TRANSLATE = { model: 'claude-opus-5-5', effort: 'low', maxTokens: 1500, timeoutMs: 60_000 }
+// The panels a card can open, top right, each generated on its first opening
+// and then kept on the shared card. Translating and conjugating are plain jobs;
+// explaining grammar takes some judgement.
+const EXTRAS = {
+  gram: {
+    icon: '📐', name: 'gramática', hotkey: '6',
+    call: { model: 'claude-opus-5-5', effort: 'medium', maxTokens: 2500, timeoutMs: 120_000 },
+    has: (c) => Array.isArray(c.grammarDe), request: grammarRequest, parse: parseGrammar,
+    lines: (c) => grammarLines(c),
+  },
+  conj: {
+    icon: '🔤', name: 'conjugação', hotkey: '7',
+    call: { model: 'claude-opus-5-5', effort: 'low', maxTokens: 3000, timeoutMs: 120_000 },
+    has: (c) => Array.isArray(c.verbs), request: conjugationRequest, parse: parseConjugation,
+    lines: (c) => conjugationLines(c),
+  },
+  de: {
+    icon: '🇩🇪', name: 'tradução', hotkey: '0',
+    call: { model: 'claude-opus-5-5', effort: 'low', maxTokens: 1500, timeoutMs: 60_000 },
+    has: (c) => Boolean(c.questionDe || c.explainDe), request: translationRequest, parse: parseTranslation,
+    lines: (c, stage, quizOk) => germanLines(c, stage, quizOk).map((l) => '🇩🇪 ' + l),
+  },
+}
 const BATCH = 10
 const REFILL_BELOW = 4
 const POLL_MS = 3000
@@ -52,9 +74,9 @@ let refilling = false
 let recording = Promise.resolve()
 let syncTimer = null
 let armed = null
-// The card whose German translation is open in this session, if any.
-let translated = null
-let translating = null
+// The one extra panel open in this session ({ id, kind }), and the one being fetched.
+let open = null
+let loading = null
 let syncReport = 'not synced yet'
 let lastBatch = 'none yet'
 let failure = ''
@@ -112,7 +134,7 @@ export function register(on) {
       next: (id) => nextCard($, id),
       speak: () => speak($),
       flag: (id) => flag($, id),
-      translate: (id) => toggleTranslation($, id),
+      extra: (id, kind) => toggleExtra($, id, kind),
     })
     return Box({ flexDirection: 'column', children: fit(parts, e.props.maxRows ?? 99, e.props.bodyColumns ?? 80) })
   })
@@ -194,28 +216,35 @@ function view(Box, Text, Button, act) {
     Button({ key: 'speak', label: '🔊 ouvir', hotkey: '8', plain: true, onPress: act.speak }),
     Button({ key: 'flag', label: flagLabel, hotkey: '9', plain: true, dimColor: Boolean(current.flagged), onPress: () => act.flag(id) }),
   ]
-  const german = germanLines(card, stage, current.quizOk)
-  const deLabel = translating === id ? '🇩🇪 traduzindo…' : translated === id ? '🇩🇪 esconder' : '🇩🇪 tradução'
-  const deButton = Button({ key: 'de', label: deLabel, hotkey: '0', plain: true, onPress: () => act.translate(id) })
-  // 🇩🇪 sits at the top right, in the header, so the header is never dropped.
+  const extraButtons = Object.entries(EXTRAS).map(([kind, x]) => {
+    const isOpen = open?.id === id && open.kind === kind
+    const label = loading?.id === id && loading.kind === kind ? `${x.icon} …` : isOpen ? `${x.icon} fechar` : `${x.icon} ${x.name}`
+    return Button({ key: kind, label, hotkey: x.hotkey, plain: true, onPress: () => act.extra(id, kind) })
+  })
+  // 📐 🔤 🇩🇪 sit at the top right, in the header, so the header is never dropped.
   const top = {
     text: head.text,
     drop: 0,
-    make: (cut) => Box({ flexDirection: 'row', justifyContent: 'space-between', children: [head.make(cut), deButton] }),
+    make: (cut) =>
+      Box({
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        children: [head.make(cut), Box({ flexDirection: 'row', columnGap: 3, children: extraButtons })],
+      }),
   }
   // Asked for, so never dropped to save rows; cut to one line at worst.
-  const de = translated === id ? german.map((l) => text('🇩🇪 ' + l, { italic: true, dimColor: true })) : []
+  const extra = open?.id === id ? EXTRAS[open.kind].lines(card, stage, current.quizOk).map((l) => text(l, { italic: true, dimColor: true })) : []
   const next = Button({ key: 'next', label: 'próxima', hotkey: '1', plain: true, onPress: () => act.next(id) })
   const note = text('📚 ' + card.note, { dimColor: true }, 1)
 
   if (card.format === 'bonus') {
-    return [top, gap, text(ASK.bonus, { bold: true }), text(card.question), text(card.explain), ...de, note, gap, row([next])]
+    return [top, gap, text(ASK.bonus, { bold: true }), text(card.question), text(card.explain), ...extra, note, gap, row([next])]
   }
   if (stage === 'quiz') {
     const options = card.options.map((o, i) =>
       Button({ key: 'opt-' + i, label: o, hotkey: String(i + 1), plain: true, onPress: () => act.pick(id, i) }),
     )
-    return [top, gap, text('❓ ' + ASK[card.format], { bold: true }), text(card.question), ...de, gap, row(options)]
+    return [top, gap, text('❓ ' + ASK[card.format], { bold: true }), text(card.question), ...extra, gap, row(options)]
   }
   const verdict = current.quizOk
     ? `✅ Certo! +${current.gain} · ${card.capiRight}`
@@ -232,7 +261,7 @@ function view(Box, Text, Button, act) {
     gap,
     text(verdict, { color: current.quizOk ? 'green' : 'red' }),
     text(`${card.explain} (Fonte: ${card.source})`),
-    ...de,
+    ...extra,
     note,
     gap,
     row(ask),
@@ -250,22 +279,24 @@ function fit(parts, maxRows, cols) {
   return keep.map((p) => (p.make ? p.make(cut) : p.node))
 }
 
-// Opens or closes the German lines. A card made before translations existed
-// is translated on the first open, and the result is kept on the shared card.
-async function toggleTranslation($, id) {
+// Opens or closes one extra panel; opening one closes the others. A panel the
+// card has no content for yet is generated on that first opening, and the
+// result is kept on the shared card, so no session pays for it twice.
+async function toggleExtra($, id, kind) {
   if (!current || current.card.id !== id) return
-  translated = translated === id ? null : id
+  const x = EXTRAS[kind]
+  open = open?.id === id && open.kind === kind ? null : { id, kind }
   $.ui.invalidate('ui.render')
   const card = current.card
-  if (translated !== id || translating === id || card.questionDe || card.explainDe) return
-  translating = id
+  if (open?.kind !== kind || (loading?.id === id && loading.kind === kind) || x.has(card)) return
+  loading = { id, kind }
   $.ui.invalidate('ui.render')
-  const r = await complete($, TRANSLATE, translationRequest(card))
-  translating = null
-  const fields = r.ok ? parseTranslation(r.text) : {}
+  const r = await complete($, x.call, x.request(card))
+  loading = null
+  const fields = r.ok ? x.parse(r.text) : {}
   if (Object.keys(fields).length === 0) {
-    if (translated === id) translated = null
-    $.ui.toast(`Capi não conseguiu traduzir (${r.ok ? 'resposta sem tradução' : r.reason})`)
+    if (open?.id === id && open.kind === kind) open = null
+    $.ui.toast(`Capi não conseguiu (${x.name}: ${r.ok ? 'resposta sem conteúdo' : r.reason})`)
   } else {
     const shared = (await $.store.get('current')) ?? null
     if (shared?.card.id === id) {
@@ -591,7 +622,8 @@ async function complete($, opts, req) {
 // Follows the card another session moved to, and keeps cards coming.
 async function poll($) {
   const shared = (await $.store.get('current')) ?? null
-  const key = (c) => (c ? `${c.card.id}:${c.stage}:${c.flagged ? 1 : 0}:${c.card.questionDe ? 1 : 0}` : '')
+  const key = (c) =>
+    c ? `${c.card.id}:${c.stage}:${c.flagged ? 1 : 0}:${Object.values(EXTRAS).map((x) => (x.has(c.card) ? 1 : 0)).join('')}` : ''
   if (key(shared) !== key(current)) {
     current = shared
     $.ui.invalidate('ui.render')
