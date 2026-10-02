@@ -81,6 +81,8 @@ let open = null
 let verbTab = null
 // The band folded to its header line. Kept in $.store, so a new session opens it the same way.
 let minimized = false
+// The band closed with ×: this session only, so a new session or /ptbr show brings it back.
+let closed = false
 let loading = null
 let syncReport = 'not synced yet'
 let lastBatch = 'none yet'
@@ -101,7 +103,7 @@ export function register(on) {
     await $.command.register({
       name: 'ptbr',
       description: 'Capi: your Portuguese progress (skip: next card)',
-      argumentHint: '[skip]',
+      argumentHint: '[skip|show]',
       immediate: true,
     })
     return next(e)
@@ -111,6 +113,11 @@ export function register(on) {
     if (e.args.trim() === 'skip') {
       await advance($)
       return { text: 'Capi: card skipped' }
+    }
+    if (e.args.trim() === 'show') {
+      closed = false
+      $.ui.invalidate('ui.render')
+      return { text: 'Capi: back above the prompt' }
     }
     await sync($).catch((err) => (syncReport = 'sync failed: ' + (err?.message ?? err)))
     return { text: statsText(await $.clock.now()) }
@@ -133,7 +140,7 @@ export function register(on) {
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     // Always there, working or not: a card waits until it is answered, and only
     // answering pulls new cards, so a visible band never costs a model call.
-    if (e.props.hasSurvey) return next(e)
+    if (e.props.hasSurvey || closed) return next(e)
     const { Box, Text, Button, Svg } = $.ui.resolve(e)
     // a remote surface draws the fold chevron; the terminal has no drawings and shows text
     const parts = view(Box, Text, Button, e.surface === 'terminal' ? null : Svg, (e.props.bodyColumns ?? 80) - ICON_W, {
@@ -146,6 +153,11 @@ export function register(on) {
       verb: (id, index) => {
         verbTab = { id, index }
         $.ui.invalidate('ui.render')
+      },
+      close: () => {
+        closed = true
+        $.ui.invalidate('ui.render')
+        $.ui.toast('Capi is hidden in this session. /ptbr show brings it back.')
       },
       size: async () => {
         minimized = !minimized
@@ -232,17 +244,23 @@ function view(Box, Text, Button, Svg, cols, act) {
   }
   // The fold toggle is a grey chevron alone, like the app's own chips: no emoji, no hotkey, no word.
   // A label cannot be rotated and no font draws ⌄ and › as one shape, so a remote surface
-  // draws the chevron under a blank button: the button is drawn after the drawing, so it sits
-  // on top and takes the click. The terminal shows ⌄ and ›.
-  const toggle = Button({ key: 'size', label: Svg ? '  ' : minimized ? '›' : '⌄', plain: true, dimColor: true, onPress: act.size })
-  const size = Svg
-    ? Box({
-        flexDirection: 'row',
-        children: [Box({ position: 'absolute', top: 0, left: 0, children: [chevron(Svg, minimized)] }), toggle],
-      })
-    : toggle
-  // The header line: the pairs, and the fold toggle alone at its right end.
-  const top = { ...head, make: (cut) => head.make(cut, size) }
+  // draws the icon under a blank button: the button is drawn after the drawing, so it sits
+  // on top and takes the click. The terminal shows the text.
+  const iconButton = (key, path, alt, label, onPress) => {
+    const button = Button({ key, label: Svg ? '  ' : label, plain: true, dimColor: true, onPress })
+    return Svg ? Box({ flexDirection: 'row', children: [Box({ position: 'absolute', top: 0, left: 0, children: [drawing(Svg, path, alt)] }), button] }) : button
+  }
+  // ⌄ while open, › while folded, then × to close: the controls Claude's own question cards use.
+  const controls = Box({
+    flexDirection: 'row',
+    columnGap: GAP,
+    children: [
+      minimized ? iconButton('size', RIGHT, 'abrir', '›', act.size) : iconButton('size', DOWN, 'recolher', '⌄', act.size),
+      iconButton('close', CROSS, 'fechar', '×', act.close),
+    ],
+  })
+  // The header line: the pairs, and the window controls at its right end.
+  const top = { ...head, make: (cut) => head.make(cut, controls) }
   // Folded, or with no card yet: the header line with 🔼/🔽 alone at its right.
   if (minimized || !current) {
     if (minimized) return [top]
@@ -383,13 +401,15 @@ function tables(Box, Text, Button, list, selected, choose) {
   return [{ node: Box({ flexDirection: 'row', columnGap: GAP, children: [tabs, table] }), rows: Math.max(list.length, t.rows.length + 1) }]
 }
 
-// The fold chevron as a drawing, the disclosure pattern Claude's own question
-// cards use: ⌄ while open, › while folded. One path, turned a quarter for ›, in
-// a mid grey that reads on both the dark and the light theme.
-function chevron(Svg, folded) {
-  const d = folded ? 'M5 12 L9 8 L5 4' : 'M3 6 L7 10 L11 6'
+// The band's controls as drawings, as Claude's own question cards draw them: ⌄
+// while open, › while folded (the same path turned a quarter), × to close. A mid
+// grey that reads on both the dark and the light theme.
+const DOWN = 'M3 6 L7 10 L11 6'
+const RIGHT = 'M5 12 L9 8 L5 4'
+const CROSS = 'M4 5 L10 11 M10 5 L4 11'
+function drawing(Svg, d, alt) {
   const source = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 14 16"><path d="${d}" fill="none" stroke="#a0a0a0" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`
-  return Svg({ source, alt: folded ? 'abrir' : 'recolher', width: 14, height: 16 })
+  return Svg({ source, alt, width: 14, height: 16 })
 }
 
 // The cells a row of elements takes: Text by its words, a Button by its label

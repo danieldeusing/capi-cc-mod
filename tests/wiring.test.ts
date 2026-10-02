@@ -267,6 +267,20 @@ test('short of width, actions keep icon and digit only, then the header and answ
   expect((await at(40, 4)).wrap).toBe('nowrap')
 })
 
+test('× hides the band in this session only, and /ptbr show brings it back', async ($, on) => {
+  const { store, toasts, clock } = engine(on, [reply(five())])
+  await start($, clock)
+  const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
+  await ui.press({ key: 'close' })
+  expect(await ui.find({ key: 'opt-0' })).toBeUndefined()
+  expect(await ui.find({ key: 'close' })).toBeUndefined()
+  expect(toasts.some((t) => t.includes('/ptbr show'))).toBe(true)
+  expect([...store.keys()].some((k) => /closed/.test(String(k)))).toBe(false) // nothing kept: a new session shows the band
+  const r = (await $.command.run({ command: 'ptbr', args: 'show' })) as any
+  expect(r.text).toMatch(/back/)
+  expect(await ui.find({ key: 'opt-0' })).toBeDefined()
+})
+
 test('a band folded in another session opens folded', async ($, on) => {
   const { store, clock } = engine(on, [reply(five())])
   store.set('minimized', true)
@@ -361,7 +375,7 @@ test('📐 🔤 🇩🇪 sit top right, 🇩🇪 on key 0, 🔊 🚩 bottom righ
     // header: ONE line, the card's pairs then the learner's, with 📐 🔤 🇩🇪 at its right
     const header = root0.children[0]
     expect(header.props.justifyContent).toBe('space-between')
-    expect(keysIn(header.children[1])).toEqual(['size']) // the fold toggle alone at the header's right
+    expect(keysIn(header.children[1])).toEqual(['size', 'close']) // ⌄ and × at the header's right
     expect(words(header.children[0])).toEqual(['🦫', 'categoria', 'brasil', 'tipo', 'Fala', 'pergunta', 'Verdade ou mentira', 'nível', 'Turista 0/50', 'sequência', '0 dias', 'combo', '0'])
     expect(words(root0.children[0]).join(' ')).not.toMatch(/[·│|]/) // one structure: no separators
     // labels dim, every value and the question at full strength, the question bold

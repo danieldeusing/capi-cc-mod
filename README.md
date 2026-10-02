@@ -22,9 +22,12 @@ you know come back later, and your history syncs between your Macs through iClou
 Click the grey chevron at the right end of the header (⌄) to fold the band to
 that one line, and again (›) to open it. The band remembers, also in new sessions.
 
+Click × next to it to hide Capi in this session. Only this session: a new
+session shows the band again, and `/ptbr show` brings it back right away.
+
 `/ptbr` shows level, streak, points, what is due, and how the last sync and card
 generation went. It answers instantly, also while Claude works. `/ptbr skip` drops
-the current card.
+the current card, and `/ptbr show` brings back a band you closed with ×.
 
 ## Install
 
