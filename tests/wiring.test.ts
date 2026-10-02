@@ -278,13 +278,12 @@ test('📐 🔤 🇩🇪 sit top right, 🇩🇪 on key 0, 🔊 🚩 bottom righ
     expect(bar.props.justifyContent).toBe('space-between')
     expect(bar.children[0].children.map((c: any) => c.props.key)).toEqual(['opt-0', 'opt-1'])
     expect(bar.children[1].children.map((c: any) => c.props.key)).toEqual(['speak', 'flag'])
-    // header: line 1 the card's pairs with 📐 🔤 🇩🇪 at its right, line 2 the learner's
-    const [line1, line2] = root0.children[0].children
-    expect(line1.props.justifyContent).toBe('space-between')
-    expect(line1.children[1].children.map((c: any) => c.props.key)).toEqual(['gram', 'conj', 'de'])
+    // header: ONE line, the card's pairs then the learner's, with 📐 🔤 🇩🇪 at its right
+    const header = root0.children[0]
+    expect(header.props.justifyContent).toBe('space-between')
+    expect(header.children[1].children[0].children.map((c: any) => c.props.key)).toEqual(['gram', 'conj', 'de'])
     const words = (box: any): string[] => (box.children ?? []).flatMap((c: any) => (typeof c === 'string' ? [c] : words(c)))
-    expect(words(line1.children[0])).toEqual(['🦫', 'categoria', 'brasil', 'tipo', 'Fala', 'pergunta', 'Verdade ou mentira'])
-    expect(words(line2)).toEqual(['nível', 'Turista 0/50', 'sequência', '0 dias', 'combo', '0'])
+    expect(words(header.children[0])).toEqual(['🦫', 'categoria', 'brasil', 'tipo', 'Fala', 'pergunta', 'Verdade ou mentira', 'nível', 'Turista 0/50', 'sequência', '0 dias', 'combo', '0'])
     expect(words(root0.children[0]).join(' ')).not.toMatch(/[·│|]/) // one structure: no separators
     // the question type lives in the header now, not above the question
     expect(await ui.find({ type: 'Text', text: /Verdade ou mentira\?/ })).toBeUndefined()

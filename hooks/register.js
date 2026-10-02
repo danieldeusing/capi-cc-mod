@@ -186,35 +186,28 @@ function view(Box, Text, Button, act) {
     make: (cut) => Text({ ...props, wrap: cut ? 'truncate-end' : 'wrap', children: [t] }),
   })
   const node = (n) => ({ node: n })
-  // Two lines of label and value pairs, labels dim, set apart by space alone:
-  // the card (categoria, tipo, pergunta), then the learner, all dimmed.
+  // One line of label and value pairs, labels dim, set apart by space alone:
+  // the card (categoria, tipo, pergunta), then the learner, dimmed. 📐 🔤 🇩🇪
+  // sit at its right end and never shrink; the values give way first.
   const { card: cardPairs, learner } = headerParts(current?.card, s)
-  const pairs = (list, dim) =>
-    Box({
-      flexDirection: 'row',
-      columnGap: GAP,
-      children: list.map(([k, v]) =>
-        Box({ flexDirection: 'row', columnGap: 1, children: [Text({ dimColor: true, children: [k] }), Text({ dimColor: dim, wrap: 'truncate-end', children: [v] })] }),
-      ),
-    })
-  const lead = (child) => Box({ width: 4, children: child ? [child] : [] })
+  const pair = ([k, v], dim) =>
+    Box({ flexDirection: 'row', columnGap: 1, flexShrink: 1, children: [Text({ dimColor: true, children: [k] }), Text({ dimColor: dim, wrap: 'truncate-end', children: [v] })] })
   const head = {
-    text: [...cardPairs, ...learner].flat().join('  '),
+    text: '', // always one row
     drop: 0,
     make: (_cut, side) =>
       Box({
-        flexDirection: 'column',
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        columnGap: GAP,
         children: [
-          ...(cardPairs.length
-            ? [
-                Box({
-                  flexDirection: 'row',
-                  justifyContent: 'space-between',
-                  children: [Box({ flexDirection: 'row', children: [lead(Text({ children: ['🦫'] })), pairs(cardPairs, false)] }), ...(side ? [side] : [])],
-                }),
-              ]
-            : []),
-          Box({ flexDirection: 'row', children: [lead(cardPairs.length ? null : Text({ children: ['🦫'] })), pairs(learner, true)] }),
+          Box({
+            flexDirection: 'row',
+            columnGap: GAP,
+            flexShrink: 1,
+            children: [Text({ children: ['🦫'] }), ...cardPairs.map((p) => pair(p, false)), ...learner.map((p) => pair(p, true))],
+          }),
+          ...(side ? [Box({ flexShrink: 0, children: [side] })] : []),
         ],
       }),
   }
@@ -328,7 +321,7 @@ function tables(Box, Text, Button, list, selected, choose) {
       node: Box({
         flexDirection: 'row',
         children: cells.map((c, j) =>
-          Box({ width: j === 0 ? 12 : 22, children: [Text({ bold: i === 0 && j === 0, dimColor: (i === 0) !== (j === 0), italic: i === 0 && j > 0, wrap: 'truncate-end', children: [c] })] }),
+          Box({ width: t.widths[j] + GAP, children: [Text({ bold: i === 0 && j === 0, dimColor: (i === 0) !== (j === 0), italic: i === 0 && j > 0, wrap: 'truncate-end', children: [c] })] }),
         ),
       }),
     })

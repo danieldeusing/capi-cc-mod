@@ -214,6 +214,7 @@ test('grammar and conjugation replies are checked, tables follow the config, and
   assert.deepEqual(table.header, ['ser', 'presente', 'pretérito perfeito', 'pretérito imperfeito', 'futuro', 'subjuntivo presente'])
   assert.deepEqual(table.rows.map((r) => r[0]), ['eu', 'você', 'ele/ela', 'nós', 'vocês']) // as the morning briefs: no tu, no vós
   assert.deepEqual(table.rows[1], ['você', 'p1', 'p1', 'p1', 'f1', 's1'])
+  assert.deepEqual(table.widths, [7, 8, 18, 20, 6, 19]) // longest cell per column: ele/ela, then the tense names
   // a cloze card's item is the answer: it never reaches the model, and the prompt forbids filling the gap
   const req = x.conjugationRequest(card({ format: 'cloze', question: 'Se cê ___ no Pantanal' }))
   assert.equal(JSON.parse(req.prompt).item, undefined)

@@ -73,9 +73,11 @@ export function grammarLines(card) {
 export function conjugationTables(card, cfg = DEFAULT_CONFIG) {
   return (card.verbs ?? [])
     .filter((v) => fitsTable(v, cfg))
-    .map((v) => ({
-      verb: v.infinitive,
-      header: [v.infinitive, ...cfg.tenses],
-      rows: cfg.persons.map((p, i) => [p, ...cfg.tenses.map((t) => v.tenses[t][i])]),
-    }))
+    .map((v) => {
+      const header = [v.infinitive, ...cfg.tenses]
+      const rows = cfg.persons.map((p, i) => [p, ...cfg.tenses.map((t) => v.tenses[t][i])])
+      // each column as wide as its longest cell
+      const widths = header.map((_, j) => Math.max(...[header, ...rows].map((r) => r[j].length)))
+      return { verb: v.infinitive, header, rows, widths }
+    })
 }
