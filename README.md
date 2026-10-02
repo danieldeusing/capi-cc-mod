@@ -13,12 +13,14 @@ you know come back later, and your history syncs between your Macs through iClou
 | key | does |
 | --- | --- |
 | `1`–`4` | answer the quiz, then `sim`/`não`: did you know the expression? |
-| `5` | 🔽 fold the band to its header line, 🔼 open it again |
 | `6` | 📐 grammar notes: contractions and the case they do the job of, word order, mood, colloquial forms |
 | `7` | 🔤 every verb in the sentence, one tab per verb: present, perfect, imperfect, future, subjunctive, all persons |
 | `0` | 🇩🇪 the card in your own language (the flag is yours to set) |
 | `8` | 🔊 hear it (macOS voice *Luciana*) |
 | `9`, then `9` again | 🚩 the fact is wrong: it is never used again, and Capi re-checks it |
+
+Click 🔽 at the right end of the header to fold the band to that one line, and
+🔼 to open it again. The band remembers, also in new sessions.
 
 `/ptbr` shows level, streak, points, what is due, and how the last sync and card
 generation went. It answers instantly, also while Claude works. `/ptbr skip` drops

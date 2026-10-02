@@ -209,17 +209,19 @@ test('the band follows the card another session moved to', async ($, on) => {
   expect(await ui.find({ type: 'Text', text: /Carta da outra sessão/ })).toBeDefined()
 })
 
-test('🔽 folds the band to its header line on key 5, 🔼 opens it again, and a new session remembers', async ($, on) => {
+test('🔽 folds the band to its header line, 🔼 opens it again, and a new session remembers', async ($, on) => {
   const { store, clock } = engine(on, [reply(five())])
   await start($, clock)
   const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
-  expect(await ui.find({ key: 'size' })).toMatchObject({ props: { label: '🔽 recolher', hotkey: '5' } })
+  const toggle = (await ui.find({ key: 'size' })) as any
+  expect(toggle.props.label).toBe('🔽') // the icon alone
+  expect(toggle.props.hotkey).toBeUndefined()
   await ui.press({ key: 'size' })
   const folded = (await ui.find({ type: 'Box' })) as any
   expect(folded.children.length).toBe(1) // the header line alone
   expect(await ui.find({ key: 'opt-0' })).toBeUndefined()
   expect(await ui.find({ key: 'gram' })).toBeUndefined()
-  expect(await ui.find({ key: 'size' })).toMatchObject({ props: { label: '🔼 abrir' } })
+  expect(await ui.find({ key: 'size' })).toMatchObject({ props: { label: '🔼' } })
   expect(store.get('minimized')).toBe(true)
   await ui.press({ key: 'size' })
   expect(await ui.find({ key: 'opt-0' })).toBeDefined()
@@ -232,7 +234,7 @@ test('a band folded in another session opens folded', async ($, on) => {
   await start($, clock)
   const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
   expect(await ui.find({ key: 'opt-0' })).toBeUndefined()
-  expect(await ui.find({ key: 'size' })).toMatchObject({ props: { label: '🔼 abrir' } })
+  expect(await ui.find({ key: 'size' })).toMatchObject({ props: { label: '🔼' } })
 })
 
 test('a card that arrives after the turn ended shows while idle', async ($, on) => {
