@@ -159,7 +159,7 @@ function view(Box, Text, Button, act) {
   }
   const { card, stage } = current
   const id = card.id
-  // Answers on the left; 🔊, 🚩 and 🇩🇪 always on the right, in that order.
+  // Answers on the left; 🔊 and 🚩 on the right, in line with them.
   const row = (children) =>
     node(
       Box({
@@ -167,7 +167,7 @@ function view(Box, Text, Button, act) {
         justifyContent: 'space-between',
         children: [
           Box({ flexDirection: 'row', columnGap: 3, children }),
-          Box({ flexDirection: 'row', columnGap: 3, children: [...tools, deButton] }),
+          Box({ flexDirection: 'row', columnGap: 3, children: tools }),
         ],
       }),
     )
@@ -182,19 +182,25 @@ function view(Box, Text, Button, act) {
   const german = germanLines(card, stage, current.quizOk)
   const deLabel = translating === id ? '🇩🇪 traduzindo…' : translated === id ? '🇩🇪 esconder' : '🇩🇪 tradução'
   const deButton = Button({ key: 'de', label: deLabel, hotkey: '0', plain: true, onPress: () => act.translate(id) })
+  // 🇩🇪 sits at the top right, in the header, so the header is never dropped.
+  const top = {
+    text: head.text,
+    drop: 0,
+    make: (cut) => Box({ flexDirection: 'row', justifyContent: 'space-between', children: [head.make(cut), deButton] }),
+  }
   // Asked for, so never dropped to save rows; cut to one line at worst.
   const de = translated === id ? german.map((l) => text('🇩🇪 ' + l, { italic: true, dimColor: true })) : []
   const next = Button({ key: 'next', label: 'próxima', hotkey: '1', plain: true, onPress: () => act.next(id) })
   const note = text('📚 ' + card.note, { dimColor: true }, 1)
 
   if (card.format === 'bonus') {
-    return [head, gap, text(ASK.bonus, { bold: true }), text(card.question), text(card.explain), ...de, note, gap, row([next])]
+    return [top, gap, text(ASK.bonus, { bold: true }), text(card.question), text(card.explain), ...de, note, gap, row([next])]
   }
   if (stage === 'quiz') {
     const options = card.options.map((o, i) =>
       Button({ key: 'opt-' + i, label: o, hotkey: String(i + 1), plain: true, onPress: () => act.pick(id, i) }),
     )
-    return [head, gap, text('❓ ' + ASK[card.format], { bold: true }), text(card.question), ...de, gap, row(options)]
+    return [top, gap, text('❓ ' + ASK[card.format], { bold: true }), text(card.question), ...de, gap, row(options)]
   }
   const verdict = current.quizOk
     ? `✅ Certo! +${current.gain} · ${card.capiRight}`
@@ -207,7 +213,7 @@ function view(Box, Text, Button, act) {
         Button({ key: 'no', label: 'não', hotkey: '2', plain: true, onPress: () => act.grade(id, false) }),
       ]
   return [
-    head,
+    top,
     gap,
     text(verdict, { color: current.quizOk ? 'green' : 'red' }),
     text(`${card.explain} (Fonte: ${card.source})`),

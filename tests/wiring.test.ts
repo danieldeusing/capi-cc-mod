@@ -263,7 +263,7 @@ test('a translation that fails says so and closes again', async ($, on) => {
   expect(await ui.find({ key: 'de' })).toMatchObject({ props: { label: '🇩🇪 tradução' } })
 })
 
-test('blank lines frame the question, answers sit left and 🔊 🚩 🇩🇪 right, 🇩🇪 on key 0', async ($, on) => {
+test('🇩🇪 sits top right on key 0, 🔊 🚩 bottom right beside the answers, blank lines frame the question', async ($, on) => {
   const { clock } = engine(on, [reply(five())])
   await start($, clock)
   for (const surface of ['terminal', 'desktop'] as const) {
@@ -275,7 +275,10 @@ test('blank lines frame the question, answers sit left and 🔊 🚩 🇩🇪 ri
     const bar = root0.children[root0.children.length - 1]
     expect(bar.props.justifyContent).toBe('space-between')
     expect(bar.children[0].children.map((c: any) => c.props.key)).toEqual(['opt-0', 'opt-1'])
-    expect(bar.children[1].children.map((c: any) => c.props.key)).toEqual(['speak', 'flag', 'de'])
+    expect(bar.children[1].children.map((c: any) => c.props.key)).toEqual(['speak', 'flag'])
+    const header = root0.children[0]
+    expect(header.props.justifyContent).toBe('space-between')
+    expect(header.children[1].props.key).toBe('de')
     await ui.unmount()
   }
 })
