@@ -223,8 +223,8 @@ function view(Box, Text, Button, act) {
         ],
       }),
   }
-  // The fold toggle is the icon alone: no hotkey, no word.
-  const size = Button({ key: 'size', label: minimized ? '🔼' : '🔽', plain: true, onPress: act.size })
+  // The fold toggle is a grey text arrow alone, like the hotkey digits: no emoji, no hotkey, no word.
+  const size = Button({ key: 'size', label: minimized ? '▴' : '▾', plain: true, dimColor: true, onPress: act.size })
   // Folded, or with no card yet: the header line with 🔼/🔽 alone at its right.
   if (minimized || !current) {
     const bar = { ...head, make: (cut) => head.make(cut, size) }
