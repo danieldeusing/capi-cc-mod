@@ -61,7 +61,7 @@ of the facts, and the conjugation table's persons and tenses. A missing file or
 key keeps the default shown in `.env.example`. Capi reads it when a session
 starts, so open a new session or run `/reload-plugins` after a change.
 
-The band's own words (Verdade ou mentira?, Nível, Kanntest du …?) stay
+The band's own words (categoria, pergunta, nível, Kanntest du …?) stay
 Portuguese and German whatever the settings say.
 
 ## Install

@@ -58,14 +58,6 @@ const FLAG_CONFIRM_MS = 10_000
 const VOICE = 'Luciana'
 const ICLOUD = 'Library/Mobile Documents/com~apple~CloudDocs/ptbr'
 
-const ASK = {
-  tf: 'Verdade ou mentira?',
-  mc: 'Qual é a resposta?',
-  number: 'Chuta o número!',
-  cloze: 'Complete a frase:',
-  meaning: 'O que significa?',
-  bonus: '✨ Bônus do Capi',
-}
 
 let home = ''
 // The learner's languages, topics and conjugation table, from the plugin's .env.
@@ -192,19 +184,35 @@ function view(Box, Text, Button, act) {
     make: (cut) => Text({ ...props, wrap: cut ? 'truncate-end' : 'wrap', children: [t] }),
   })
   const node = (n) => ({ node: n })
-  // Category in bold, a divider, then the learner's level, streak and combo, dimmed.
-  const { category, standing } = headerParts(current?.card, s)
+  // Two lines of label and value pairs, labels dim, set apart by space alone:
+  // the card (categoria, tipo, pergunta), then the learner, all dimmed.
+  const { card: cardPairs, learner } = headerParts(current?.card, s)
+  const pairs = (list, dim) =>
+    Box({
+      flexDirection: 'row',
+      columnGap: 4,
+      children: list.map(([k, v]) =>
+        Box({ flexDirection: 'row', columnGap: 1, children: [Text({ dimColor: true, children: [k] }), Text({ dimColor: dim, wrap: 'truncate-end', children: [v] })] }),
+      ),
+    })
+  const lead = (child) => Box({ width: 4, children: child ? [child] : [] })
   const head = {
-    text: ['🦫', category, '│', standing].filter(Boolean).join('  '),
-    drop: 2,
-    make: (cut) =>
+    text: [...cardPairs, ...learner].flat().join('  '),
+    drop: 0,
+    make: (_cut, side) =>
       Box({
-        flexDirection: 'row',
-        columnGap: 2,
+        flexDirection: 'column',
         children: [
-          Text({ children: ['🦫'] }),
-          ...(category ? [Text({ bold: true, wrap: cut ? 'truncate-end' : 'wrap', children: [category] }), Text({ dimColor: true, children: ['│'] })] : []),
-          Text({ dimColor: true, wrap: cut ? 'truncate-end' : 'wrap', children: [standing] }),
+          ...(cardPairs.length
+            ? [
+                Box({
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  children: [Box({ flexDirection: 'row', children: [lead(Text({ children: ['🦫'] })), pairs(cardPairs, false)] }), ...(side ? [side] : [])],
+                }),
+              ]
+            : []),
+          Box({ flexDirection: 'row', children: [lead(cardPairs.length ? null : Text({ children: ['🦫'] })), pairs(learner, true)] }),
         ],
       }),
   }
@@ -243,16 +251,11 @@ function view(Box, Text, Button, act) {
     const label = loading?.id === id && loading.kind === kind ? `${x.icon} …` : isOpen ? `${x.icon} fechar` : `${x.icon} ${x.name}`
     return Button({ key: kind, label, hotkey: x.hotkey, plain: true, onPress: () => act.extra(id, kind) })
   })
-  // 📐 🔤 🇩🇪 sit at the top right, in the header, so the header is never dropped.
+  // 📐 🔤 🇩🇪 sit at the right end of the header's first line.
   const top = {
     text: head.text,
     drop: 0,
-    make: (cut) =>
-      Box({
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        children: [head.make(cut), Box({ flexDirection: 'row', columnGap: 3, children: extraButtons })],
-      }),
+    make: (cut) => head.make(cut, Box({ flexDirection: 'row', columnGap: 3, children: extraButtons })),
   }
   // Asked for, so never dropped to save rows; cut to one line at worst.
   const x = open?.id === id ? EXTRAS[open.kind] : null
@@ -267,13 +270,13 @@ function view(Box, Text, Button, act) {
   const note = text('📚 ' + card.note, { dimColor: true }, 1)
 
   if (card.format === 'bonus') {
-    return [top, gap, text(ASK.bonus, { bold: true }), text(card.question), text(card.explain), ...panel, note, gap, row([next])]
+    return [top, gap, text(card.question), text(card.explain), ...panel, note, gap, row([next])]
   }
   if (stage === 'quiz') {
     const options = card.options.map((o, i) =>
       Button({ key: 'opt-' + i, label: o, hotkey: String(i + 1), plain: true, onPress: () => act.pick(id, i) }),
     )
-    return [top, gap, text('❓ ' + ASK[card.format], { bold: true }), text(card.question), ...(extra.length ? [gap, ...extra] : []), gap, row(options)]
+    return [top, gap, text(card.question), ...(extra.length ? [gap, ...extra] : []), gap, row(options)]
   }
   const verdict = current.quizOk
     ? `✅ Certo! +${current.gain} · ${card.capiRight}`

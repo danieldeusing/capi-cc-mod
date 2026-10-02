@@ -188,16 +188,17 @@ test('both prompts translate the taught expression too, except where it is the a
   }
 })
 
-test('the header labels the category and the level separately', async () => {
+test('the header is label and value pairs: the card, then the learner, with no separators in values', async () => {
   const { headerParts } = await import('../hooks/lib/cards.js')
   const s = replay([answer(T0, 'a', 'ok')], T0) // known through placement: 1 of 50
   assert.deepEqual(headerParts(card({ topic: 'Comida · botânica' }), s), {
-    category: 'Categoria: 🗣️ Fala · Comida · botânica',
-    standing: 'Nível: Turista 1/50 · 🔥 1 dia · combo x1',
+    card: [['categoria', 'Comida, botânica'], ['tipo', 'Fala'], ['pergunta', 'Verdade ou mentira']],
+    learner: [['nível', 'Turista 1/50'], ['sequência', '1 dia'], ['combo', '1']],
   })
-  assert.equal(headerParts(card({ kind: 'grammar', topic: '' }), s).category, 'Categoria: 📐 Gramática')
-  assert.equal(headerParts(null, s).category, null)
-  assert.match(headerParts(card(), { ...s, known: 700, level: levelFor(700) }).standing, /^Nível: Brasileiro de coração · 🔥/)
+  assert.equal(headerParts(card({ topic: 'Saúde | exercício - corpo' }), s).card[0][1], 'Saúde, exercício, corpo')
+  assert.deepEqual(headerParts(card({ kind: 'grammar', topic: '', format: 'cloze' }), s).card, [['tipo', 'Gramática'], ['pergunta', 'Complete a frase']])
+  assert.deepEqual(headerParts(null, s).card, [])
+  assert.equal(headerParts(card(), { ...s, known: 700, level: levelFor(700) }).learner[0][1], 'Brasileiro de coração')
 })
 
 test('grammar and conjugation replies are checked, tables follow the config, and a gap is never filled', async () => {
