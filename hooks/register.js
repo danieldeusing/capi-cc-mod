@@ -233,6 +233,9 @@ function view(Box, Text, Button, act) {
         ],
       }),
     )
+  // A blank line between the blocks of the card. Always kept: when the band is
+  // short the note goes and texts are cut instead.
+  const gap = { text: '', drop: 0, make: () => Text({ children: [' '] }) }
   const flagLabel = current.flagged ? '🚩 marcado' : armed?.id === id ? '🚩 de novo = confirmar' : '🚩 tá errado?'
   const tools = [
     Button({ key: 'speak', label: '🔊 ouvir', hotkey: '8', plain: true, onPress: act.speak }),
@@ -256,18 +259,19 @@ function view(Box, Text, Button, act) {
     : x.tables
       ? tables(Box, Text, Button, x.tables(card), verbTab?.id === id ? verbTab.index : 0, (i) => act.verb(id, i))
       : x.lines(card, stage, current.quizOk).map((l) => text(l, { italic: true, dimColor: true }))
+  // An open panel stands apart from the card with a blank line on either side.
+  const panel = extra.length ? [gap, ...extra, gap] : []
   const next = Button({ key: 'next', label: 'próxima', hotkey: '1', plain: true, onPress: () => act.next(id) })
   const note = text('📚 ' + card.note, { dimColor: true }, 1)
-  const question = text('❓ ' + card.question, { bold: true })
 
   if (card.format === 'bonus') {
-    return [top, question, text(card.explain), ...extra, note, row([next])]
+    return [top, gap, text('❓ ' + card.question, { bold: true }), text(card.explain), ...panel, note, gap, row([next])]
   }
   if (stage === 'quiz') {
     const options = card.options.map((o, i) =>
       Button({ key: 'opt-' + i, label: o, hotkey: String(i + 1), plain: true, onPress: () => act.pick(id, i) }),
     )
-    return [top, question, ...extra, row(options)]
+    return [top, gap, text('❓ ' + card.question, { bold: true }), ...(extra.length ? [gap, ...extra] : []), gap, row(options)]
   }
   const verdict = current.quizOk
     ? `✅ Certo! +${current.gain} · ${card.capiRight}`
@@ -281,10 +285,12 @@ function view(Box, Text, Button, act) {
       ]
   return [
     top,
+    gap,
     text(verdict, { color: current.quizOk ? 'green' : 'red' }),
     text(`${card.explain} (Fonte: ${card.source})`),
-    ...extra,
+    ...panel,
     note,
+    gap,
     row(ask),
   ]
 }
@@ -308,6 +314,7 @@ function tables(Box, Text, Button, list, selected, choose) {
         ),
       }),
     })
+    parts.push({ text: '', drop: 0, make: () => Text({ children: [' '] }) })
   }
   for (const [i, cells] of [t.header, ...t.rows].entries()) {
     parts.push({
@@ -323,8 +330,8 @@ function tables(Box, Text, Button, list, selected, choose) {
 }
 
 // A tree taller than the band scrolls, and then the digit hotkeys stop working.
-// So: drop the note, then cut every text to one line. The header and an open
-// panel stay.
+// So: drop the note, then cut every text to one line. Blank lines, the header
+// and an open panel stay.
 function fit(parts, maxRows, cols) {
   const rows = (p, cut) => (p.make && !cut ? Math.max(1, Math.ceil(p.text.length / Math.max(cols, 20))) : 1)
   const height = (list, cut) => list.reduce((n, p) => n + rows(p, cut), 0)
