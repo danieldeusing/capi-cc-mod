@@ -265,14 +265,14 @@ test('a translation that fails says so and closes again', async ($, on) => {
   expect(await ui.find({ key: 'de' })).toMatchObject({ props: { label: '🇩🇪 tradução' } })
 })
 
-test('📐 🔤 🇩🇪 sit top right, 🇩🇪 on key 0, 🔊 🚩 bottom right beside the answers, blank lines frame the question', async ($, on) => {
+test('📐 🔤 🇩🇪 sit top right, 🇩🇪 on key 0, 🔊 🚩 bottom right beside the answers, no blank lines', async ($, on) => {
   const { clock } = engine(on, [reply(five())])
   await start($, clock)
   for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await $.ui.mount({ ...BAND, surface })
     const root0 = (await ui.find({ type: 'Box' })) as any
     const blanks = root0.children.map((c: any, i: number) => (c.type === 'Text' && c.children?.[0] === ' ' ? i : -1)).filter((i: number) => i >= 0)
-    expect(blanks).toEqual([1, root0.children.length - 2]) // under the header, above the buttons
+    expect(blanks).toEqual([]) // header, question and answers sit on consecutive rows
     expect(await ui.find({ key: 'de' })).toMatchObject({ props: { hotkey: '0' } })
     const bar = root0.children[root0.children.length - 1]
     expect(bar.props.justifyContent).toBe('space-between')
@@ -289,7 +289,8 @@ test('📐 🔤 🇩🇪 sit top right, 🇩🇪 on key 0, 🔊 🚩 bottom righ
     const values = header.children[0].children.slice(1).map((p: any) => p.children[1].props)
     expect(values.every((v: any) => !v.dimColor)).toBe(true)
     expect(header.children[0].children.slice(1).every((p: any) => p.children[0].props.dimColor)).toBe(true)
-    expect(root0.children[2].props.bold).toBe(true) // the question, under the blank line
+    expect(root0.children[1].props).toMatchObject({ bold: true }) // the question, right under the header
+    expect(root0.children[1].children[0]).toMatch(/^❓ /)
     // the question type lives in the header now, not above the question
     expect(await ui.find({ type: 'Text', text: /Verdade ou mentira\?/ })).toBeUndefined()
     await ui.unmount()
@@ -363,9 +364,8 @@ test('🔤 shows one verb at a time in tabs, and an open panel stands apart from
   expect(await ui.find({ type: 'Text', text: 'saP1' })).toBeUndefined()
   expect(model.length).toBe(2) // switching tabs asks for nothing
 
-  // the question, a blank line, then the panel
+  // the question, then the panel's tabs, then its table
   const root = (await ui.find({ type: 'Box' })) as any
   const q = root.children.findIndex((c: any) => c.type === 'Text' && /ficam de fora/.test(c.children?.[0] ?? ''))
-  expect(root.children[q + 1].children?.[0]).toBe(' ')
-  expect(root.children[q + 2].children.map((c: any) => c.props.key)).toEqual(['verb-0', 'verb-1'])
+  expect(root.children[q + 1].children.map((c: any) => c.props.key)).toEqual(['verb-0', 'verb-1'])
 })
