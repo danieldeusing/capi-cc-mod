@@ -54,7 +54,7 @@ Translations, so the learner can check what he read: "questionDe" is the questio
 Tone: playful, warm, a bit cheeky. "capiRight" and "capiWrong" are Capi's Portuguese one-liners of at most 12 words, funny and never mean.
 
 Reply with ONLY a JSON array. Each card:
-{"kind":"spoken|grammar|vocab|bonus","topic":"...","format":"tf|mc|number|cloze|meaning|bonus","item":"...","de":"German meaning of the item","question":"...","options":["..."],"answer":0,"explain":"one or two short Portuguese sentences with the true fact","note":"in German: «item» = meaning, plus one usage hint","source":"...","capiRight":"...","capiWrong":"...","questionDe":"...","optionsDe":[],"explainDe":"...","capiRightDe":"...","capiWrongDe":"..."}`
+{"kind":"spoken|grammar|vocab|bonus","topic":"short Portuguese category of the fact, 1 to 3 words, e.g. Comida · botânica or História do Brasil","format":"tf|mc|number|cloze|meaning|bonus","item":"...","de":"German meaning of the item","question":"...","options":["..."],"answer":0,"explain":"one or two short Portuguese sentences with the true fact","note":"in German: «item» = meaning, plus one usage hint","source":"...","capiRight":"...","capiWrong":"...","questionDe":"...","optionsDe":[],"explainDe":"...","capiRightDe":"...","capiWrongDe":"..."}`
 
 // The batch to ask for. queue: cards already waiting; activity: what Claude is
 // busy with right now. Once today's new items are used up and nothing is due,
@@ -180,4 +180,17 @@ export function parseTranslation(text) {
   for (const k of ['questionDe', 'explainDe', 'capiRightDe', 'capiWrongDe']) if (isText(raw?.[k])) out[k] = raw[k]
   if (Array.isArray(raw?.optionsDe) && raw.optionsDe.every(isText)) out.optionsDe = raw.optionsDe
   return out
+}
+
+const KIND_LABELS = { spoken: '🗣️ Fala', grammar: '📐 Gramática', vocab: '📖 Vocabulário', bonus: '✨ Bônus' }
+
+// The header in two labelled halves: what the card is about, and where the
+// learner stands. `category` is null when there is no card.
+export function headerParts(card, state) {
+  const { level, known, streak, combo } = state
+  const progress = level.next === null ? level.name : `${level.name} ${known}/${level.next}`
+  const standing = `Nível: ${progress} · 🔥 ${streak} dia${streak === 1 ? '' : 's'} · combo x${combo}`
+  if (!card) return { category: null, standing }
+  const label = [KIND_LABELS[card.kind], isText(card.topic) ? card.topic.trim() : ''].filter(Boolean).join(' · ')
+  return { category: label ? `Categoria: ${label}` : null, standing }
 }

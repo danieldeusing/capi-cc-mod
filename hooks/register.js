@@ -8,7 +8,7 @@
 
 import { replay, dayOf } from './lib/srs.js'
 import { parseJsonl, toJsonl, merge, monthFile } from './lib/log.js'
-import { buildRequest, parseCards, activityHint, germanLines, translationRequest, parseTranslation, ITEM_FORMATS } from './lib/cards.js'
+import { buildRequest, parseCards, activityHint, germanLines, headerParts, translationRequest, parseTranslation, ITEM_FORMATS } from './lib/cards.js'
 
 // The facts have to be TRUE, so batches go to Opus at high effort. They run in
 // the background while cards are still queued, so the latency costs nothing.
@@ -148,7 +148,22 @@ function view(Box, Text, Button, act) {
     make: (cut) => Text({ ...props, wrap: cut ? 'truncate-end' : 'wrap', children: [t] }),
   })
   const node = (n) => ({ node: n })
-  const head = text(`🦫 Capi · ${s.level.name} · 🔥 ${s.streak} dia${s.streak === 1 ? '' : 's'} · combo x${s.combo}`, { dimColor: true }, 2)
+  // Category in bold, a divider, then the learner's level, streak and combo, dimmed.
+  const { category, standing } = headerParts(current?.card, s)
+  const head = {
+    text: ['🦫', category, '│', standing].filter(Boolean).join('  '),
+    drop: 2,
+    make: (cut) =>
+      Box({
+        flexDirection: 'row',
+        columnGap: 2,
+        children: [
+          Text({ children: ['🦫'] }),
+          ...(category ? [Text({ bold: true, wrap: cut ? 'truncate-end' : 'wrap', children: [category] }), Text({ dimColor: true, children: ['│'] })] : []),
+          Text({ dimColor: true, wrap: cut ? 'truncate-end' : 'wrap', children: [standing] }),
+        ],
+      }),
+  }
   if (!current) {
     const msg = refilling
       ? 'Capi está preparando cartas… ☕'

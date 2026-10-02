@@ -187,3 +187,15 @@ test('both prompts translate the taught expression too, except where it is the a
     assert.match(prompt, /in a "meaning" card keep the item in Portuguese/)
   }
 })
+
+test('the header labels the category and the level separately', async () => {
+  const { headerParts } = await import('../hooks/lib/cards.js')
+  const s = replay([answer(T0, 'a', 'ok')], T0) // known through placement: 1 of 50
+  assert.deepEqual(headerParts(card({ topic: 'Comida · botânica' }), s), {
+    category: 'Categoria: 🗣️ Fala · Comida · botânica',
+    standing: 'Nível: Turista 1/50 · 🔥 1 dia · combo x1',
+  })
+  assert.equal(headerParts(card({ kind: 'grammar', topic: '' }), s).category, 'Categoria: 📐 Gramática')
+  assert.equal(headerParts(null, s).category, null)
+  assert.match(headerParts(card(), { ...s, known: 700, level: levelFor(700) }).standing, /^Nível: Brasileiro de coração · 🔥/)
+})

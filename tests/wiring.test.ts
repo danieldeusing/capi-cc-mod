@@ -279,6 +279,9 @@ test('🇩🇪 sits top right on key 0, 🔊 🚩 bottom right beside the answer
     const header = root0.children[0]
     expect(header.props.justifyContent).toBe('space-between')
     expect(header.children[1].props.key).toBe('de')
+    const halves = header.children[0].children
+    expect(halves.map((c: any) => c.children[0])).toEqual(['🦫', 'Categoria: 🗣️ Fala · brasil', '│', 'Nível: Turista 0/50 · 🔥 0 dias · combo x0'])
+    expect(halves[1].props.bold).toBe(true)
     await ui.unmount()
   }
 })
