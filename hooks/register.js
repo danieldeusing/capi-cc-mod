@@ -42,7 +42,7 @@ const EXTRAS = {
     name: 'tradução', hotkey: '0',
     call: { model: 'claude-opus-5-5', effort: 'low', maxTokens: 1500, timeoutMs: 60_000 },
     has: (c) => Boolean(c.questionDe || c.explainDe), request: (c) => translationRequest(c, cfg), parse: (t) => parseTranslation(t),
-    lines: (c, stage, quizOk) => germanLines(c, stage, quizOk).map((l) => cfg.nativeFlag + ' ' + l),
+    lines: (c, stage, quizOk) => germanLines(c, stage, quizOk),
   },
 }
 const BATCH = 10
@@ -143,7 +143,8 @@ export function register(on) {
         $.ui.invalidate('ui.render')
       },
     })
-    return Box({ flexDirection: 'column', children: fit(parts, e.props.maxRows ?? 99, e.props.bodyColumns ?? 80) })
+    const body = parts.map((p) => (p.flush ? p : indent(Box, Text, p)))
+    return Box({ flexDirection: 'column', children: fit(body, e.props.maxRows ?? 99, (e.props.bodyColumns ?? 80) - ICON_W) })
   })
 }
 
@@ -188,7 +189,7 @@ function view(Box, Text, Button, act) {
   const node = (n) => ({ node: n })
   // An icon in a column of its own, so the header and the question start their
   // text at the same place whatever the icon's drawn width.
-  const icon = (glyph) => Box({ width: 2 + GAP, flexShrink: 0, children: [Text({ children: [glyph] })] })
+  const icon = (glyph) => Box({ width: ICON_W, flexShrink: 0, children: [Text({ children: [glyph] })] })
   // One line of label and value pairs, labels dim, set apart by space alone:
   // the card (categoria, tipo, pergunta), then the learner. 📐 🔤 🇩🇪
   // sit at its right end and never shrink; the values give way first.
@@ -196,6 +197,7 @@ function view(Box, Text, Button, act) {
   const pair = ([k, v]) =>
     Box({ flexDirection: 'row', columnGap: 1, flexShrink: 1, children: [Text({ dimColor: true, children: [k] }), Text({ wrap: 'truncate-end', children: [v] })] })
   const head = {
+    flush: true,
     text: '', // always one row
     drop: 0,
     make: (_cut, side) =>
@@ -223,14 +225,16 @@ function view(Box, Text, Button, act) {
   }
   const { card, stage } = current
   const question = {
+    flush: true,
     text: '❓ ' + card.question,
     drop: 0,
     make: (cut) => Box({ flexDirection: 'row', children: [icon('❓'), Text({ bold: true, wrap: cut ? 'truncate-end' : 'wrap', children: [card.question] })] }),
   }
   const id = card.id
   // Answers on the left; 🔊 and 🚩 on the right, in line with them.
-  const row = (children) =>
-    node(
+  const row = (children) => ({
+    icon: '👉',
+    ...node(
       Box({
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -239,10 +243,11 @@ function view(Box, Text, Button, act) {
           Box({ flexDirection: 'row', columnGap: GAP, children: tools }),
         ],
       }),
-    )
+    ),
+  })
   // A blank line between the blocks of the card. Always kept: when the band is
   // short the note goes and texts are cut instead.
-  const gap = { text: '', drop: 0, make: () => Text({ children: [' '] }) }
+  const gap = { text: '', drop: 0, flush: true, make: () => Text({ children: [' '] }) }
   const flagLabel = current.flagged ? '🚩 marcado' : armed?.id === id ? '🚩 de novo = confirmar' : '🚩 tá errado?'
   const tools = [
     Button({ key: 'speak', label: '🔊 ouvir', hotkey: '8', plain: true, onPress: act.speak }),
@@ -255,6 +260,7 @@ function view(Box, Text, Button, act) {
   })
   // 📐 🔤 🇩🇪 sit at the right end of the header's first line.
   const top = {
+    flush: true,
     text: head.text,
     drop: 0,
     make: (cut) => head.make(cut, Box({ flexDirection: 'row', columnGap: GAP, children: extraButtons })),
@@ -266,10 +272,11 @@ function view(Box, Text, Button, act) {
     : x.tables
       ? tables(Box, Text, Button, x.tables(card), verbTab?.id === id ? verbTab.index : 0, (i) => act.verb(id, i))
       : x.lines(card, stage, current.quizOk).map((l) => text(l, { italic: true, dimColor: true }))
+  if (extra.length) extra[0] = { ...extra[0], icon: x.icon } // the panel's icon, once, in the icon column
   // An open panel stands apart from the card with a blank line on either side.
   const panel = extra.length ? [gap, ...extra, gap] : []
   const next = Button({ key: 'next', label: 'próxima', hotkey: '1', plain: true, onPress: () => act.next(id) })
-  const note = text('📚 ' + card.note, { dimColor: true }, 1)
+  const note = { ...text(card.note, { dimColor: true }, 1), icon: '📚' }
 
   if (card.format === 'bonus') {
     return [top, gap, question, text(card.explain), ...panel, note, gap, row([next])]
@@ -281,8 +288,8 @@ function view(Box, Text, Button, act) {
     return [top, gap, question, ...(extra.length ? [gap, ...extra] : []), gap, row(options)]
   }
   const verdict = current.quizOk
-    ? `✅ Certo! +${current.gain} · ${card.capiRight}`
-    : `❌ Errou! Era «${card.options[card.answer]}» · ${card.capiWrong}`
+    ? `Certo! +${current.gain} · ${card.capiRight}`
+    : `Errou! Era «${card.options[card.answer]}» · ${card.capiWrong}`
   const ask = current.graded
     ? [next]
     : [
@@ -293,7 +300,7 @@ function view(Box, Text, Button, act) {
   return [
     top,
     gap,
-    text(verdict, { color: current.quizOk ? 'green' : 'red' }),
+    { ...text(verdict, { color: current.quizOk ? 'green' : 'red' }), icon: current.quizOk ? '✅' : '❌' },
     text(`${card.explain} (Fonte: ${card.source})`),
     ...panel,
     note,
@@ -332,6 +339,17 @@ function tables(Box, Text, Button, list, selected, choose) {
     ),
   })
   return [{ node: Box({ flexDirection: 'row', columnGap: GAP, children: [tabs, table] }), rows: Math.max(list.length, t.rows.length + 1) }]
+}
+
+// Everything under the header starts where the header's text does: after the
+// icon column. Each block names itself there: 🦫 the header, ❓ the question,
+// 📐 🔤 🇩🇪 an open panel (on its first line), ✅ ❌ the verdict, 📚 the note,
+// 👉 the answers. Parts marked flush draw the column themselves or are blank.
+const ICON_W = 2 + GAP
+function indent(Box, Text, p) {
+  const column = Box({ width: ICON_W, flexShrink: 0, children: p.icon ? [Text({ children: [p.icon] })] : [] })
+  const shift = (n) => Box({ flexDirection: 'row', children: [column, Box({ flexDirection: 'column', flexGrow: 1, flexShrink: 1, children: [n] })] })
+  return p.node ? { ...p, node: shift(p.node) } : { ...p, make: (cut) => shift(p.make(cut)) }
 }
 
 // A tree taller than the band scrolls, and then the digit hotkeys stop working.

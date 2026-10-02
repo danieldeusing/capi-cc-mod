@@ -65,7 +65,7 @@ export function parseConjugation(text, cfg = DEFAULT_CONFIG) {
 }
 
 export function grammarLines(card) {
-  return (card.grammarDe ?? []).map((n) => '📐 ' + n)
+  return card.grammarDe ?? []
 }
 
 // One table per verb, the way the morning briefs draw it: the tenses across,

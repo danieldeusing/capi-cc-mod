@@ -79,6 +79,9 @@ function engine(on: any, replies: unknown[], files = new Map<string, string>(), 
   return { store, files, model, logs, writes, toasts, clock }
 }
 
+// every string under a node, in drawing order
+const words = (box: any): string[] => (box.children ?? []).flatMap((c: any) => (typeof c === 'string' ? [c] : words(c)))
+
 const BAND = {
   plugin: 'ptbr',
   component: 'AbovePrompt',
@@ -111,7 +114,8 @@ for (const surface of ['terminal', 'desktop'] as const) {
 
     await clock.advance(1000)
     await ui.press({ key: 'opt-0' })
-    expect(await ui.find({ type: 'Text', text: /✅ Certo! \+10/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /^Certo! \+10/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: '✅' })).toBeDefined() // in the icon column
 
     await clock.advance(1000)
     await ui.press({ key: 'yes' })
@@ -225,7 +229,7 @@ test('🇩🇪 opens the translation under the card and closes it again', async 
     const ui = await $.ui.mount({ ...BAND, surface })
     expect(await ui.find({ type: 'Text', text: /🇩🇪/ })).toBeUndefined()
     await ui.press({ key: 'de' })
-    expect(await ui.find({ type: 'Text', text: /🇩🇪 Nur Chile und Ecuador/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /^Nur Chile und Ecuador/ })).toBeDefined()
     await ui.press({ key: 'de' })
     expect(await ui.find({ type: 'Text', text: /🇩🇪/ })).toBeUndefined()
     await ui.unmount()
@@ -235,8 +239,8 @@ test('🇩🇪 opens the translation under the card and closes it again', async 
   await ui.press({ key: 'de' })
   await clock.advance(1000)
   await ui.press({ key: 'opt-0' })
-  expect(await ui.find({ type: 'Text', text: /🇩🇪 Gut gemacht!/ })).toBeDefined()
-  expect(await ui.find({ type: 'Text', text: /🇩🇪 Stimmt: 10 Nachbarn/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /^Gut gemacht!/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /^Stimmt: 10 Nachbarn/ })).toBeDefined()
 })
 
 test('🇩🇪 on a card made before translations translates it once, and every session sees it', async ($, on) => {
@@ -247,7 +251,7 @@ test('🇩🇪 on a card made before translations translates it once, and every 
   await ui.press({ key: 'de' })
   expect(model.length).toBe(2)
   expect(model[1]).toMatchObject({ model: 'claude-opus-5-5', effort: 'low' })
-  expect(await ui.find({ type: 'Text', text: /🇩🇪 Nur Chile und Ecuador/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /^Nur Chile und Ecuador/ })).toBeDefined()
   expect((store.get('current') as any).card.questionDe).toBe(de.questionDe)
   // closing and opening again costs nothing
   await ui.press({ key: 'de' })
@@ -274,7 +278,10 @@ test('📐 🔤 🇩🇪 sit top right, 🇩🇪 on key 0, 🔊 🚩 bottom righ
     const blanks = root0.children.map((c: any, i: number) => (c.type === 'Text' && c.children?.[0] === ' ' ? i : -1)).filter((i: number) => i >= 0)
     expect(blanks).toEqual([1, root0.children.length - 2]) // under the header, above the buttons
     expect(await ui.find({ key: 'de' })).toMatchObject({ props: { hotkey: '0' } })
-    const bar = root0.children[root0.children.length - 1]
+    // the answers, indented to the text column with 👉 in the icon column
+    const answers = root0.children[root0.children.length - 1]
+    expect(words(answers.children[0])).toEqual(['👉'])
+    const bar = answers.children[1].children[0]
     expect(bar.props.justifyContent).toBe('space-between')
     expect(bar.children[0].children.map((c: any) => c.props.key)).toEqual(['opt-0', 'opt-1'])
     expect(bar.children[1].children.map((c: any) => c.props.key)).toEqual(['speak', 'flag'])
@@ -282,7 +289,6 @@ test('📐 🔤 🇩🇪 sit top right, 🇩🇪 on key 0, 🔊 🚩 bottom righ
     const header = root0.children[0]
     expect(header.props.justifyContent).toBe('space-between')
     expect(header.children[1].children[0].children.map((c: any) => c.props.key)).toEqual(['gram', 'conj', 'de'])
-    const words = (box: any): string[] => (box.children ?? []).flatMap((c: any) => (typeof c === 'string' ? [c] : words(c)))
     expect(words(header.children[0])).toEqual(['🦫', 'categoria', 'brasil', 'tipo', 'Fala', 'pergunta', 'Verdade ou mentira', 'nível', 'Turista 0/50', 'sequência', '0 dias', 'combo', '0'])
     expect(words(root0.children[0]).join(' ')).not.toMatch(/[·│|]/) // one structure: no separators
     // labels dim, every value and the question at full strength, the question bold
@@ -312,7 +318,7 @@ test('📐 and 🔤 are generated once each, at their effort, and only one panel
 
   await ui.press({ key: 'gram' })
   expect(model[1]).toMatchObject({ effort: 'medium' })
-  expect(await ui.find({ type: 'Text', text: /📐 «do caju» = de \+ o/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /^«do caju» = de \+ o/ })).toBeDefined()
 
   await ui.press({ key: 'conj' })
   expect(model[2]).toMatchObject({ effort: 'low' })
@@ -326,7 +332,7 @@ test('📐 and 🔤 are generated once each, at their effort, and only one panel
 
   await ui.press({ key: 'gram' }) // back to grammar: kept, no new call
   expect(model.length).toBe(3)
-  expect(await ui.find({ type: 'Text', text: /📐 «do caju»/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /^«do caju»/ })).toBeDefined()
   const kept = (store.get('current') as any).card
   expect(kept.grammarDe.length).toBe(2)
   expect(kept.verbs[0].infinitive).toBe('ser')
@@ -370,11 +376,11 @@ test('🔤 shows one verb at a time in tabs, and an open panel stands apart from
 
   // the question, a blank line, then the panel
   const root = (await ui.find({ type: 'Box' })) as any
-  const words = (box: any): string[] => (box.children ?? []).flatMap((c: any) => (typeof c === 'string' ? [c] : words(c)))
   const q = root.children.findIndex((c: any) => /ficam de fora/.test(words(c).join(' ')))
   expect(root.children[q + 1].children?.[0]).toBe(' ')
   // the verbs as tabs down the left, the table beside them
-  const [tabs, table] = root.children[q + 2].children
+  expect(words(root.children[q + 2].children[0])).toEqual(['🔤']) // the panel's icon in the icon column
+  const [tabs, table] = root.children[q + 2].children[1].children[0].children
   expect(tabs.props.flexDirection).toBe('column')
   expect(tabs.props.width).toBe('sacar'.length + 4) // fixed by the longest verb, whichever is chosen
   expect(tabs.children.map((c: any) => c.props.key)).toEqual(['verb-0', 'verb-1'])
