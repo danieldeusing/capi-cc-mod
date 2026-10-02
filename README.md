@@ -36,6 +36,26 @@ the current card, and `/capi show` brings back a band you closed with ×.
 You need Claude Code 2.1.287 or later with mods turned on. To check, run
 `claude plugin test` in an empty directory: it must not say "turned off".
 
+There are two ways in: from [seedr](https://seedr.danieldeusing.de/plugin/capi)
+with one command, or from GitHub as a clone you keep up to date with `git pull`.
+
+### From seedr
+
+```bash
+npx @danieldeusing/seedr add capi --type plugin --agents claude
+```
+
+This installs Capi as a Claude Code plugin and turns it on, for every project. Add
+`--scope project` to turn it on in the current project only. Start a new session:
+the band appears above the prompt and the first ten cards arrive within a minute
+or two.
+
+The plugin lands in `~/.claude/plugins/cache/capi/capi/<version>/`, and that is
+the folder your `.env` goes in (see [Configure](#configure)). A new version
+installs into a new folder, so keep a copy of your `.env`.
+
+### From GitHub
+
 1. Clone the repository wherever you keep code:
 
    ```bash
@@ -59,12 +79,15 @@ A session that was already open before step 2 does not see the mod.
 `/reload-plugins` picks up changes to a mod that is already loaded, not a new
 folder, so open a new session.
 
-On a second Mac, repeat the three steps. Both Macs read and write the same history
-in iCloud Drive, under `capi/`.
+### More than one Mac
+
+Install on each Mac the same way. Both Macs read and write the same history in
+iCloud Drive, under `capi/`.
 
 ## Configure
 
-Copy `.env.example` to `.env` in the same folder and change what you like. Git
+Copy `.env.example` to `.env` in the plugin folder (your clone, or the seedr
+install folder above) and change what you like. Git
 ignores `.env`. A missing file or key keeps the default shown in `.env.example`.
 Capi reads the file when a session starts, so open a new session (or run
 `/reload-plugins`) after a change.
