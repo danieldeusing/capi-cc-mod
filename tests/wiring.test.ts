@@ -72,7 +72,6 @@ function engine(on: any, replies: unknown[], files = new Map<string, string>(), 
   on('session.start', () => ({ cwd: '/work' }))
   on('turn.start', ($: any, e: any) => ({ turnId: e.turnId }))
   on('turn.complete', () => ({ text: '' }))
-  on('classic.Stop', () => ({}))
   on('ui.render', () => ({ type: 'Text', props: {}, children: ['engine'] }))
   return { store, files, model, logs, writes, clock }
 }
@@ -194,32 +193,23 @@ test('🚩 needs a second press, and only then asks for a re-check', async ($, o
   expect(log[0].type).toBe('flag')
 })
 
-test('a subagent finishing does not stop the band from following other sessions', async ($, on) => {
+test('the band follows the card another session moved to', async ($, on) => {
   const { store, clock } = engine(on, [reply(five())])
   await start($, clock)
-  await $.turn.complete({ turnId: 't1', agentId: 'sub1', answer: 'done', durationMs: 1, isAborted: false, usage: null } as any)
-  // another session moves on to a card of its own
   store.set('current', { card: { ...card({ question: 'Carta da outra sessão' }), id: 'other' }, stage: 'quiz', at: T0 })
   await clock.advance(3500)
   const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
   expect(await ui.find({ type: 'Text', text: /Carta da outra sessão/ })).toBeDefined()
 })
 
-test('the band stays while background work runs after the turn, and goes when it is done', async ($, on) => {
+test('a card that arrives after the turn ended shows while idle', async ($, on) => {
+  // what happened live: a short turn starts the request, ends, and the cards come later
   const { clock } = engine(on, [reply(five())])
-  await start($, clock)
-  await $.turn.complete({ turnId: 't1', answer: 'started a 5 minute wait', durationMs: 1, isAborted: false, usage: null } as any)
-  await $.classic.Stop({ background_tasks: [{ id: 'b1', type: 'shell', status: 'running', description: 'sleep 300' }] } as any)
-
+  await $.session.start({ surface: 'desktop', isInteractive: true, cwd: '/work' })
+  await $.turn.start({ text: 'start a background wait', turnId: 't1' })
+  await $.turn.complete({ turnId: 't1', answer: 'started', durationMs: 1, isAborted: false, usage: null } as any)
+  await clock.settle()
   const idle = { ...BAND, props: { ...BAND.props, isWorking: false } }
-  let ui = await $.ui.mount({ ...idle, surface: 'desktop' })
+  const ui = await $.ui.mount({ ...idle, surface: 'desktop' })
   expect(await ui.find({ type: 'Text', text: /ficam de fora/ })).toBeDefined()
-  expect(await ui.find({ type: 'Text', text: /⏳ 1 tarefa rodando/ })).toBeDefined()
-  await ui.unmount()
-
-  // the task finished, its notification woke the session, that turn stopped with nothing left
-  await $.classic.Stop({ background_tasks: [] } as any)
-  ui = await $.ui.mount({ ...idle, surface: 'desktop' })
-  expect(await ui.find({ type: 'Text', text: 'engine' })).toBeDefined()
-  expect(await ui.find({ type: 'Text', text: /ficam de fora/ })).toBeUndefined()
 })
