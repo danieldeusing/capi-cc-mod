@@ -265,15 +265,13 @@ test('a translation that fails says so and closes again', async ($, on) => {
   expect(await ui.find({ key: 'de' })).toMatchObject({ props: { label: '🇩🇪 tradução' } })
 })
 
-test('📐 🔤 🇩🇪 sit top right, 🇩🇪 on key 0, 🔊 🚩 bottom right beside the answers, spacers frame the question', async ($, on) => {
+test('📐 🔤 🇩🇪 sit top right, 🇩🇪 on key 0, 🔊 🚩 bottom right beside the answers, blank lines frame the question', async ($, on) => {
   const { clock } = engine(on, [reply(five())])
   await start($, clock)
   for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await $.ui.mount({ ...BAND, surface })
     const root0 = (await ui.find({ type: 'Box' })) as any
-    // a blank row in the terminal; on Desktop an empty drawing half a row tall
-    const spacer = (c: any) => (surface === 'terminal' ? c.type === 'Text' && c.children?.[0] === ' ' : c.type === 'Svg' && c.props.height === 9)
-    const blanks = root0.children.map((c: any, i: number) => (spacer(c) ? i : -1)).filter((i: number) => i >= 0)
+    const blanks = root0.children.map((c: any, i: number) => (c.type === 'Text' && c.children?.[0] === ' ' ? i : -1)).filter((i: number) => i >= 0)
     expect(blanks).toEqual([1, root0.children.length - 2]) // under the header, above the buttons
     expect(await ui.find({ key: 'de' })).toMatchObject({ props: { hotkey: '0' } })
     const bar = root0.children[root0.children.length - 1]
@@ -366,10 +364,10 @@ test('🔤 shows one verb at a time in tabs, and an open panel stands apart from
   expect(await ui.find({ type: 'Text', text: 'saP1' })).toBeUndefined()
   expect(model.length).toBe(2) // switching tabs asks for nothing
 
-  // the question, a spacer, then the panel
+  // the question, a blank line, then the panel
   const root = (await ui.find({ type: 'Box' })) as any
   const q = root.children.findIndex((c: any) => c.type === 'Text' && /ficam de fora/.test(c.children?.[0] ?? ''))
-  expect(root.children[q + 1]).toMatchObject({ type: 'Svg', props: { height: 9 } }) // Desktop: half a row
+  expect(root.children[q + 1].children?.[0]).toBe(' ')
   // the verbs as tabs down the left, the table beside them
   const [tabs, table] = root.children[q + 2].children
   expect(tabs.props.flexDirection).toBe('column')
@@ -377,7 +375,7 @@ test('🔤 shows one verb at a time in tabs, and an open panel stands apart from
   expect(table.children.length).toBe(6) // the tenses, then one row per person
 
   // the panel counts as its 6 rows when the band is short: header, question, panel, answers
-  // and 3 spaces are 12 rows, so 11 cuts texts to one line and 12 does not
+  // and 3 blank lines are 12 rows, so 11 cuts texts to one line and 12 does not
   const question = async (maxRows: number) => {
     const band = await $.ui.mount({ ...BAND, props: { ...BAND.props, maxRows }, surface: 'desktop' })
     const r = (await band.find({ type: 'Box' })) as any

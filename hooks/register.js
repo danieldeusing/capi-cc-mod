@@ -130,9 +130,8 @@ export function register(on) {
     // Always there, working or not: a card waits until it is answered, and only
     // answering pulls new cards, so a visible band never costs a model call.
     if (e.props.hasSurvey) return next(e)
-    const { Box, Text, Button, Svg } = $.ui.resolve(e)
-    // the terminal counts in rows; only a remote surface gets the pixel spacer
-    const parts = view(Box, Text, Button, e.surface === 'terminal' ? undefined : Svg, {
+    const { Box, Text, Button } = $.ui.resolve(e)
+    const parts = view(Box, Text, Button, {
       pick: (id, i) => pick($, id, i),
       grade: (id, ok) => grade($, id, ok),
       next: (id) => nextCard($, id),
@@ -179,7 +178,7 @@ async function machineName($) {
 
 // Parts of the card: { make(cut) } for text that may be cut to one line,
 // { node } otherwise. `drop` marks what goes first when the band is short.
-function view(Box, Text, Button, Svg, act) {
+function view(Box, Text, Button, act) {
   const s = state
   const text = (t, props = {}, drop = 0) => ({
     text: t,
@@ -234,9 +233,9 @@ function view(Box, Text, Button, Svg, act) {
         ],
       }),
     )
-  // The space between the blocks of the card. Always kept: when the band is
+  // A blank line between the blocks of the card. Always kept: when the band is
   // short the note goes and texts are cut instead.
-  const gap = spacer(Text, Svg)
+  const gap = { text: '', drop: 0, make: () => Text({ children: [' '] }) }
   const flagLabel = current.flagged ? '🚩 marcado' : armed?.id === id ? '🚩 de novo = confirmar' : '🚩 tá errado?'
   const tools = [
     Button({ key: 'speak', label: '🔊 ouvir', hotkey: '8', plain: true, onPress: act.speak }),
@@ -294,17 +293,6 @@ function view(Box, Text, Button, Svg, act) {
     gap,
     row(ask),
   ]
-}
-
-// A terminal's smallest vertical space is a blank row. The remote surfaces
-// (Desktop, the editor, mobile) lay out in pixels, so there the space between
-// blocks is an empty drawing about half a row tall.
-const SPACER_PX = 9
-function spacer(Text, Svg) {
-  const make = Svg
-    ? () => Svg({ source: `<svg xmlns="http://www.w3.org/2000/svg" width="1" height="${SPACER_PX}"/>`, alt: '', width: 1, height: SPACER_PX })
-    : () => Text({ children: [' '] })
-  return { text: '', drop: 0, make }
 }
 
 // Conjugation as the morning briefs draw it, one verb at a time: the verbs as
