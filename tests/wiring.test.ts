@@ -217,7 +217,7 @@ test('the band follows the card another session moved to', async ($, on) => {
   expect(await ui.find({ type: 'Text', text: /Carta da outra sessão/ })).toBeDefined()
 })
 
-test('˅ folds the band to its header line, ⌃ opens it again, and a new session remembers', async ($, on) => {
+test('⌄ folds the band to its header line, › opens it again, and a new session remembers', async ($, on) => {
   const { store, clock } = engine(on, [reply(five())])
   await start($, clock)
   const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
@@ -231,10 +231,11 @@ test('˅ folds the band to its header line, ⌃ opens it again, and a new sessio
   expect(folded.children.length).toBe(1) // the header line alone
   expect(await ui.find({ key: 'opt-0' })).toBeUndefined()
   expect(await ui.find({ key: 'gram' })).toBeUndefined()
-  // the same path, mirrored top to bottom
-  const up = await drawing()
-  const path = (src: string) => /d="M3 (\d+) L7 (\d+) L11 (\d+)"/.exec(src)!.slice(1).map(Number)
-  expect(path(up)).toEqual(path(down).map((y) => 16 - y))
+  // › is ⌄ turned a quarter about the drawing's centre (7, 8), as Claude's question cards draw them
+  const right = await drawing()
+  const points = (src: string) => /d="M(.+?)"/.exec(src)![1].split(' L').map((p) => p.split(' ').map(Number))
+  const turned = points(down).map(([x, y]) => [7 + (y - 8), 8 - (x - 7)])
+  expect(points(right).sort()).toEqual(turned.sort())
   expect(store.get('minimized')).toBe(true)
   await ui.press({ key: 'size' })
   expect(await ui.find({ key: 'opt-0' })).toBeDefined()
@@ -272,7 +273,7 @@ test('a band folded in another session opens folded', async ($, on) => {
   await start($, clock)
   const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
   expect(await ui.find({ key: 'opt-0' })).toBeUndefined()
-  expect(await ui.find({ key: 'size' })).toMatchObject({ props: { label: '⌃', dimColor: true } }) // the terminal shows text
+  expect(await ui.find({ key: 'size' })).toMatchObject({ props: { label: '›', dimColor: true } }) // the terminal shows text
 })
 
 test('a card that arrives after the turn ended shows while idle', async ($, on) => {

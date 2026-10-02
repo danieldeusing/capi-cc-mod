@@ -231,10 +231,10 @@ function view(Box, Text, Button, Svg, cols, act) {
       }),
   }
   // The fold toggle is a grey chevron alone, like the app's own chips: no emoji, no hotkey, no word.
-  // No font has a down arrow that mirrors ⌃, and a label cannot be rotated, so a remote surface
-  // draws one chevron, flipped for down, under a blank button: the button is drawn after the
-  // drawing, so it sits on top and takes the click. The terminal shows ⌃ and ˅.
-  const toggle = Button({ key: 'size', label: Svg ? '  ' : minimized ? '⌃' : '˅', plain: true, dimColor: true, onPress: act.size })
+  // A label cannot be rotated and no font draws ⌄ and › as one shape, so a remote surface
+  // draws the chevron under a blank button: the button is drawn after the drawing, so it sits
+  // on top and takes the click. The terminal shows ⌄ and ›.
+  const toggle = Button({ key: 'size', label: Svg ? '  ' : minimized ? '›' : '⌄', plain: true, dimColor: true, onPress: act.size })
   const size = Svg
     ? Box({
         flexDirection: 'row',
@@ -383,12 +383,13 @@ function tables(Box, Text, Button, list, selected, choose) {
   return [{ node: Box({ flexDirection: 'row', columnGap: GAP, children: [tabs, table] }), rows: Math.max(list.length, t.rows.length + 1) }]
 }
 
-// The fold chevron as a drawing: one path, mirrored top to bottom for down, in a
-// mid grey that reads as dimmed on both the dark and the light theme.
-function chevron(Svg, up) {
-  const d = up ? 'M3 10 L7 6 L11 10' : 'M3 6 L7 10 L11 6'
-  const source = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 14 16"><path d="${d}" fill="none" stroke="#8e8e8e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`
-  return Svg({ source, alt: up ? 'abrir' : 'recolher', width: 14, height: 16 })
+// The fold chevron as a drawing, the disclosure pattern Claude's own question
+// cards use: ⌄ while open, › while folded. One path, turned a quarter for ›, in
+// a mid grey that reads on both the dark and the light theme.
+function chevron(Svg, folded) {
+  const d = folded ? 'M5 12 L9 8 L5 4' : 'M3 6 L7 10 L11 6'
+  const source = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 14 16"><path d="${d}" fill="none" stroke="#a0a0a0" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+  return Svg({ source, alt: folded ? 'abrir' : 'recolher', width: 14, height: 16 })
 }
 
 // The cells a row of elements takes: Text by its words, a Button by its label
