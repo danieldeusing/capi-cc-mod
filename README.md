@@ -1,7 +1,8 @@
 # Capi: learn a language while Claude works
 
-A Claude Code mod. While Claude thinks, Capi the capybara shows a quiz card in the
-band above your prompt. Every card teaches one true real-world fact and one
+A Claude Code mod. Capi the capybara shows a quiz card in the band above your
+prompt, all the time or only while Claude works (`CAPI_SHOW`, see
+[Configure](#configure)). Every card teaches one true real-world fact and one
 expression in the language you learn (Brazilian Portuguese unless you
 [configure](#configure) another), with explanations in your own language. Answer with the
 digit keys (type the digit into the empty prompt) or by clicking.
@@ -77,6 +78,7 @@ Capi reads the file when a session starts, so open a new session (or run
 | `CAPI_TOPICS` | what the facts on the cards are about, comma separated | Brazil, science and nature, technology, history, everyday life, food, health and fitness |
 | `CAPI_PERSONS` | the rows of the conjugation table, separated by `\|` | `eu\|você\|ele/ela\|nós\|vocês` |
 | `CAPI_TENSES` | its columns, separated by `\|` | `presente\|pretérito perfeito\|pretérito imperfeito\|futuro\|subjuntivo presente` |
+| `CAPI_SHOW` | when the band is there: `always`, or `working` for only while Claude works | `always` |
 
 An English speaker learning Portuguese, with cards about football and music:
 

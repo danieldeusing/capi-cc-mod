@@ -241,6 +241,9 @@ test('the settings file is read plainly, and every prompt follows it', async () 
   const s = replay([], T0)
   const req = buildRequest({ now: T0, state: s, queue: [], activity: [], total: 10, cfg: configFrom({ CAPI_TOPICS: 'football and music' }) })
   assert.match(req.prompt, /Spread the facts across: football and music\./)
+  assert.equal(cfg.show, 'always')
+  assert.equal(configFrom({ CAPI_SHOW: 'Working' }).show, 'working')
+  assert.equal(configFrom({ CAPI_SHOW: 'sometimes' }).show, 'always') // anything else keeps the default
 })
 
 test('screen width in cells: an emoji or a flag two, accents and variation selectors none', () => {

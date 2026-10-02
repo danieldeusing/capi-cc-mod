@@ -13,6 +13,8 @@ export const DEFAULTS = {
   // columns are tenses, both separated by |.
   CAPI_PERSONS: 'eu|você|ele/ela|nós|vocês',
   CAPI_TENSES: 'presente|pretérito perfeito|pretérito imperfeito|futuro|subjuntivo presente',
+  // When the band is there: always, or only while Claude works.
+  CAPI_SHOW: 'always',
 }
 
 // KEY=value lines; blank lines and # comments skipped, one pair of quotes around
@@ -43,6 +45,7 @@ export function configFrom(env = {}) {
     topics: get('CAPI_TOPICS'),
     persons: list(get('CAPI_PERSONS')),
     tenses: list(get('CAPI_TENSES')),
+    show: get('CAPI_SHOW').toLowerCase() === 'working' ? 'working' : 'always',
   }
 }
 

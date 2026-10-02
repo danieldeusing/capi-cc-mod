@@ -300,6 +300,16 @@ test('a card that arrives after the turn ended shows while idle', async ($, on) 
   expect(await ui.find({ type: 'Text', text: /ficam de fora/ })).toBeDefined()
 })
 
+test('CAPI_SHOW=working shows the band only while Claude works', async ($, on) => {
+  const { clock } = engine(on, [reply(five())], new Map(), new Set(), 'CAPI_SHOW=working\n')
+  await start($, clock)
+  const idle = await $.ui.mount({ ...BAND, props: { ...BAND.props, isWorking: false }, surface: 'desktop' })
+  expect(await idle.find({ key: 'opt-0' })).toBeUndefined()
+  expect(await idle.find({ type: 'Text', text: 'engine' })).toBeDefined() // the engine draws its own
+  const working = await $.ui.mount({ ...BAND, surface: 'desktop' })
+  expect(await working.find({ key: 'opt-0' })).toBeDefined()
+})
+
 test('🇩🇪 opens the translation under the card and closes it again', async ($, on) => {
   const de = { questionDe: 'Nur Chile und Ecuador grenzen nicht an Brasilien.', explainDe: 'Stimmt: 10 Nachbarn.', capiRightDe: 'Gut gemacht!', capiWrongDe: 'Fast!' }
   const { clock } = engine(on, [reply(five(card(de)))])

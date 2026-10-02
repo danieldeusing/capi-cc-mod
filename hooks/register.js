@@ -138,9 +138,9 @@ export function register(on) {
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
-    // Always there, working or not: a card waits until it is answered, and only
-    // answering pulls new cards, so a visible band never costs a model call.
-    if (e.props.hasSurvey || closed) return next(e)
+    // Working or not, unless CAPI_SHOW=working: a card waits until it is answered,
+    // and only answering pulls new cards, so a visible band never costs a model call.
+    if (e.props.hasSurvey || closed || (cfg.show === 'working' && !e.props.isWorking)) return next(e)
     const { Box, Text, Button } = $.ui.resolve(e)
     const parts = view(Box, Text, Button, (e.props.bodyColumns ?? 80) - ICON_W, {
       pick: (id, i) => pick($, id, i),
