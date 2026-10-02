@@ -141,9 +141,8 @@ export function register(on) {
     // Always there, working or not: a card waits until it is answered, and only
     // answering pulls new cards, so a visible band never costs a model call.
     if (e.props.hasSurvey || closed) return next(e)
-    const { Box, Text, Button, Svg } = $.ui.resolve(e)
-    // a remote surface draws the fold chevron; the terminal has no drawings and shows text
-    const parts = view(Box, Text, Button, e.surface === 'terminal' ? null : Svg, (e.props.bodyColumns ?? 80) - ICON_W, {
+    const { Box, Text, Button } = $.ui.resolve(e)
+    const parts = view(Box, Text, Button, (e.props.bodyColumns ?? 80) - ICON_W, {
       pick: (id, i) => pick($, id, i),
       grade: (id, ok) => grade($, id, ok),
       next: (id) => nextCard($, id),
@@ -201,7 +200,7 @@ async function machineName($) {
 
 // Parts of the card: { make(cut) } for text that may be cut to one line,
 // { node } otherwise. `drop` marks what goes first when the band is short.
-function view(Box, Text, Button, Svg, cols, act) {
+function view(Box, Text, Button, cols, act) {
   const s = state
   const text = (t, props = {}, drop = 0) => ({
     text: t,
@@ -242,28 +241,14 @@ function view(Box, Text, Button, Svg, cols, act) {
         ],
       }),
   }
-  // The fold toggle is a grey chevron alone, like the app's own chips: no emoji, no hotkey, no word.
-  // A label cannot be rotated and no font draws ⌄ and › as one shape, so a remote surface
-  // draws the icon under a blank button. A positioned element paints above every unpositioned
-  // one, and a press on an overlay goes to its parent, so the button is positioned too and
-  // comes after the drawing: it is the one on top and takes the click. Its label is no-break
-  // spaces, which keep their width where plain spaces collapse; two em spaces make it wider
-  // than the drawing, which sits a cell in, inside it. The terminal shows the text.
-  const iconButton = (key, path, alt, label, onPress) => {
-    const button = Button({ key, label: Svg ? BLANK : label, plain: true, dimColor: true, onPress })
-    if (!Svg) return button
-    return Box({
-      flexDirection: 'row',
-      children: [Box({ position: 'absolute', top: 0, left: 1, children: [drawing(Svg, path, alt)] }), Box({ position: 'relative', children: [button] })],
-    })
-  }
-  // ⌄ while open, › while folded, then × to close: the controls Claude's own question cards use.
+  // The standard window controls, grey text like the hotkey digits: – minimize, □ restore, × close.
+  const control = (key, label, onPress) => Button({ key, label, plain: true, dimColor: true, onPress })
   const controls = Box({
     flexDirection: 'row',
     columnGap: GAP,
     children: [
-      minimized ? iconButton('size', RIGHT, 'abrir', '›', act.size) : iconButton('size', DOWN, 'recolher', '⌄', act.size),
-      iconButton('close', CROSS, 'fechar', '×', act.close),
+      control('size', minimized ? '□' : '–', act.size),
+      control('close', '×', act.close),
     ],
   })
   // The header line: the pairs, and the window controls at its right end.
@@ -406,19 +391,6 @@ function tables(Box, Text, Button, list, selected, choose) {
     ),
   })
   return [{ node: Box({ flexDirection: 'row', columnGap: GAP, children: [tabs, table] }), rows: Math.max(list.length, t.rows.length + 1) }]
-}
-
-// The band's controls as drawings, as Claude's own question cards draw them: ⌄
-// while open, › while folded (the same path turned a quarter), × to close.
-// two em spaces (about 26px): the clickable area of a drawn control, wider than its drawing
-const BLANK = '\u2003\u2003'
-const DOWN = 'M4 6 L8 10 L12 6'
-const RIGHT = 'M6 12 L10 8 L6 4'
-const CROSS = 'M4.5 4.5 L11.5 11.5 M11.5 4.5 L4.5 11.5'
-// Claude's own light grey on a dark theme, a dark grey on a light one.
-function drawing(Svg, d, alt) {
-  const source = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><style>path{stroke:#c8c8c8}@media (prefers-color-scheme:light){path{stroke:#5c5c5c}}</style><path d="${d}" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`
-  return Svg({ source, alt, width: 12, height: 12 })
 }
 
 // The cells a row of elements takes: Text by its words, a Button by its label
