@@ -78,6 +78,8 @@ let armed = null
 let open = null
 // The verb tab chosen in the conjugation panel ({ id, index }); the first by default.
 let verbTab = null
+// The band folded to its header line. Kept in $.store, so a new session opens it the same way.
+let minimized = false
 let loading = null
 let syncReport = 'not synced yet'
 let lastBatch = 'none yet'
@@ -91,6 +93,7 @@ export function register(on) {
     cfg = await loadConfig($)
     machine = await machineName($)
     current = (await $.store.get('current')) ?? null
+    minimized = (await $.store.get('minimized')) === true
     $.clock.every(POLL_MS, () => poll($))
     // Not awaited: a slow or offline iCloud must not hold up the first prompt.
     sync($).catch((err) => (syncReport = 'sync failed: ' + (err?.message ?? err)))
@@ -141,6 +144,11 @@ export function register(on) {
       verb: (id, index) => {
         verbTab = { id, index }
         $.ui.invalidate('ui.render')
+      },
+      size: async () => {
+        minimized = !minimized
+        $.ui.invalidate('ui.render')
+        await $.store.set('minimized', minimized)
       },
     })
     const body = parts.map((p) => (p.flush ? p : indent(Box, Text, p, e.surface)))
@@ -215,13 +223,17 @@ function view(Box, Text, Button, act) {
         ],
       }),
   }
-  if (!current) {
+  const size = Button({ key: 'size', label: minimized ? '🔼 abrir' : '🔽 recolher', hotkey: '5', plain: true, onPress: act.size })
+  // Folded, or with no card yet: the header line with 🔼/🔽 alone at its right.
+  if (minimized || !current) {
+    const bar = { ...head, make: (cut) => head.make(cut, size) }
+    if (minimized) return [bar]
     const msg = refilling
       ? 'Capi está preparando cartas… ☕'
       : failure
         ? `Capi tropeçou (${failure}). Já já tenta de novo.`
         : 'Capi está sem cartas. Já já tem mais!'
-    return [head, text(msg)]
+    return [bar, text(msg)]
   }
   const { card, stage } = current
   const question = {
@@ -265,7 +277,7 @@ function view(Box, Text, Button, act) {
     flush: true,
     text: head.text,
     drop: 0,
-    make: (cut) => head.make(cut, Box({ flexDirection: 'row', columnGap: GAP, children: extraButtons })),
+    make: (cut) => head.make(cut, Box({ flexDirection: 'row', columnGap: GAP, children: [...extraButtons, size] })),
   }
   // Asked for, so never dropped to save rows; cut to one line at worst.
   const x = open?.id === id ? EXTRAS[open.kind] : null

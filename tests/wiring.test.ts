@@ -209,6 +209,32 @@ test('the band follows the card another session moved to', async ($, on) => {
   expect(await ui.find({ type: 'Text', text: /Carta da outra sessão/ })).toBeDefined()
 })
 
+test('🔽 folds the band to its header line on key 5, 🔼 opens it again, and a new session remembers', async ($, on) => {
+  const { store, clock } = engine(on, [reply(five())])
+  await start($, clock)
+  const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
+  expect(await ui.find({ key: 'size' })).toMatchObject({ props: { label: '🔽 recolher', hotkey: '5' } })
+  await ui.press({ key: 'size' })
+  const folded = (await ui.find({ type: 'Box' })) as any
+  expect(folded.children.length).toBe(1) // the header line alone
+  expect(await ui.find({ key: 'opt-0' })).toBeUndefined()
+  expect(await ui.find({ key: 'gram' })).toBeUndefined()
+  expect(await ui.find({ key: 'size' })).toMatchObject({ props: { label: '🔼 abrir' } })
+  expect(store.get('minimized')).toBe(true)
+  await ui.press({ key: 'size' })
+  expect(await ui.find({ key: 'opt-0' })).toBeDefined()
+  expect(store.get('minimized')).toBe(false)
+})
+
+test('a band folded in another session opens folded', async ($, on) => {
+  const { store, clock } = engine(on, [reply(five())])
+  store.set('minimized', true)
+  await start($, clock)
+  const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+  expect(await ui.find({ key: 'opt-0' })).toBeUndefined()
+  expect(await ui.find({ key: 'size' })).toMatchObject({ props: { label: '🔼 abrir' } })
+})
+
 test('a card that arrives after the turn ended shows while idle', async ($, on) => {
   // what happened live: a short turn starts the request, ends, and the cards come later
   const { clock } = engine(on, [reply(five())])
@@ -294,7 +320,7 @@ test('📐 🔤 🇩🇪 sit top right, 🇩🇪 on key 0, 🔊 🚩 bottom righ
     // header: ONE line, the card's pairs then the learner's, with 📐 🔤 🇩🇪 at its right
     const header = root0.children[0]
     expect(header.props.justifyContent).toBe('space-between')
-    expect(header.children[1].children[0].children.map((c: any) => c.props.key)).toEqual(['gram', 'conj', 'de'])
+    expect(header.children[1].children[0].children.map((c: any) => c.props.key)).toEqual(['gram', 'conj', 'de', 'size'])
     expect(words(header.children[0])).toEqual(['🦫', 'categoria', 'brasil', 'tipo', 'Fala', 'pergunta', 'Verdade ou mentira', 'nível', 'Turista 0/50', 'sequência', '0 dias', 'combo', '0'])
     expect(words(root0.children[0]).join(' ')).not.toMatch(/[·│|]/) // one structure: no separators
     // labels dim, every value and the question at full strength, the question bold
