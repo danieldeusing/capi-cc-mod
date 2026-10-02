@@ -72,7 +72,7 @@ export function buildRequest({ now, state, queue, activity, total, cfg = DEFAULT
     .filter((it) => !queued.has(norm(it.item)))
     .slice(0, total - 1)
   const queuedNew = queue.filter((c) => c.kind !== 'bonus' && !state.items.has(norm(c.item))).length
-  const fresh = Math.min(newAllowance(state, queuedNew), total - due.length - 1)
+  const fresh = Math.min(newAllowance(state, queuedNew, cfg.newPerDay), total - due.length - 1)
   // Bonus-only batches are full size: a call costs about the same for 3 cards or 10.
   const bonus = due.length + fresh === 0 ? total : 1
 

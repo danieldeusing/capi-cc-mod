@@ -15,6 +15,8 @@ export const DEFAULTS = {
   CAPI_TENSES: 'presente|pretérito perfeito|pretérito imperfeito|futuro|subjuntivo presente',
   // When the band is there: always, or only while Claude works.
   CAPI_SHOW: 'always',
+  // New expressions a day at most, across all sessions and Macs; 0 means reviews only.
+  CAPI_NEW_PER_DAY: '25',
 }
 
 // KEY=value lines; blank lines and # comments skipped, one pair of quotes around
@@ -34,6 +36,8 @@ export function parseEnv(text) {
 }
 
 const list = (v) => v.split('|').map((x) => x.trim()).filter(Boolean)
+// a whole number of 0 or more, else the default
+const count = (v) => (/^\d+$/.test(v) ? Number(v) : Number(DEFAULTS.CAPI_NEW_PER_DAY))
 
 export function configFrom(env = {}) {
   const get = (k) => (typeof env[k] === 'string' && env[k].trim() ? env[k].trim() : DEFAULTS[k])
@@ -46,6 +50,7 @@ export function configFrom(env = {}) {
     persons: list(get('CAPI_PERSONS')),
     tenses: list(get('CAPI_TENSES')),
     show: get('CAPI_SHOW').toLowerCase() === 'working' ? 'working' : 'always',
+    newPerDay: count(get('CAPI_NEW_PER_DAY')),
   }
 }
 

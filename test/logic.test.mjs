@@ -3,7 +3,8 @@
 process.env.TZ = 'America/Sao_Paulo'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { replay, dueItems, newAllowance, levelFor, PLACEMENT_BOX, NEW_PER_DAY } from '../hooks/lib/srs.js'
+import { replay, dueItems, newAllowance, levelFor, PLACEMENT_BOX } from '../hooks/lib/srs.js'
+import { DEFAULT_CONFIG, configFrom as configFromEnv } from '../hooks/lib/config.js'
 import { parseJsonl, toJsonl, merge, monthFile } from '../hooks/lib/log.js'
 import { cells } from '../hooks/lib/cells.js'
 import { buildRequest, parseCards, activityHint, germanLines, parseTranslation, translationRequest } from '../hooks/lib/cards.js'
@@ -71,8 +72,9 @@ test('the new-item cap counts today and the queue', () => {
   const es = Array.from({ length: 7 }, (_, i) => answer(T0 + i, 'w' + i, 'ok'))
   const s = replay(es, T0)
   assert.equal(s.todayNew, 7)
-  assert.equal(newAllowance(s, 2), NEW_PER_DAY - 9)
-  assert.equal(newAllowance(s, 5), 0)
+  assert.equal(newAllowance(s, 2, 10), 1)
+  assert.equal(newAllowance(s, 5, 10), 0)
+  assert.equal(newAllowance(s, 5, 25), 13)
 })
 
 test('levels', () => {
@@ -125,8 +127,16 @@ test('buildRequest asks a missed item back in the other format', () => {
   assert.equal(req.count, 10)
 })
 
+test('CAPI_NEW_PER_DAY sets the cap buildRequest stops new items at', () => {
+  const s = replay(Array.from({ length: 12 }, (_, i) => answer(T0 + i, 'w' + i, 'ok')), T0)
+  const at = (env) => buildRequest({ now: T0 + 1000, state: s, queue: [], activity: [], total: 10, cfg: configFromEnv(env) })
+  assert.match(at({}).prompt, /^New: 9 cards/m) // 25 a day by default: 13 left, 9 fit in the batch
+  assert.doesNotMatch(at({ CAPI_NEW_PER_DAY: '12' }).prompt, /^New:/m)
+  assert.match(at({ CAPI_NEW_PER_DAY: '14' }).prompt, /^New: 2 cards/m)
+})
+
 test('buildRequest skips items already waiting and falls back to bonus cards at the cap', () => {
-  const es = Array.from({ length: NEW_PER_DAY }, (_, i) => answer(T0 + i, 'w' + i, 'ok'))
+  const es = Array.from({ length: DEFAULT_CONFIG.newPerDay }, (_, i) => answer(T0 + i, 'w' + i, 'ok'))
   const s = replay(es, T0)
   const req = buildRequest({ now: T0 + 1000, state: s, queue: [], activity: [], total: 10 })
   assert.equal(req.count, 10)
@@ -242,6 +252,11 @@ test('the settings file is read plainly, and every prompt follows it', async () 
   const req = buildRequest({ now: T0, state: s, queue: [], activity: [], total: 10, cfg: configFrom({ CAPI_TOPICS: 'football and music' }) })
   assert.match(req.prompt, /Spread the facts across: football and music\./)
   assert.equal(cfg.show, 'always')
+  assert.equal(cfg.newPerDay, 25)
+  assert.equal(configFrom({ CAPI_NEW_PER_DAY: '40' }).newPerDay, 40)
+  assert.equal(configFrom({ CAPI_NEW_PER_DAY: '0' }).newPerDay, 0) // reviews only
+  assert.equal(configFrom({ CAPI_NEW_PER_DAY: 'lots' }).newPerDay, 25)
+  assert.equal(configFrom({ CAPI_NEW_PER_DAY: '-3' }).newPerDay, 25)
   assert.equal(configFrom({ CAPI_SHOW: 'Working' }).show, 'working')
   assert.equal(configFrom({ CAPI_SHOW: 'sometimes' }).show, 'always') // anything else keeps the default
 })

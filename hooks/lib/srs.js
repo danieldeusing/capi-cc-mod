@@ -13,7 +13,6 @@ export const PLACEMENT_DAYS = 7
 export const PLACEMENT_BOX = 4
 // A miss comes back the same day, in another format (the payback round).
 export const PAYBACK_MINUTES = 20
-export const NEW_PER_DAY = 10
 
 export const LEVELS = [
   [0, 'Turista'],
@@ -132,7 +131,8 @@ export function dueItems(state, now) {
   return [...state.items.values()].filter((it) => it.due <= now).sort((a, b) => a.due - b.due)
 }
 
-// New items still allowed today, counting the ones already waiting in the queue.
-export function newAllowance(state, queuedNew) {
-  return Math.max(0, NEW_PER_DAY - state.todayNew - queuedNew)
+// New items still allowed today (perDay is CAPI_NEW_PER_DAY), counting the ones
+// already waiting in the queue.
+export function newAllowance(state, queuedNew, perDay) {
+  return Math.max(0, perDay - state.todayNew - queuedNew)
 }
