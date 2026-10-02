@@ -49,10 +49,12 @@ Formats:
 - "meaning": the sentence, then which German meaning the item has; 3 or 4 German options.
 - "bonus": no quiz. A Brazilian proverb, an idiom with its story, or a word with a surprising origin. kind "bonus", options [], answer -1, item may be "".
 
+Translations, so the learner can check what he read: "questionDe" is the question in German, "explainDe" the explanation in German, "capiRightDe" and "capiWrongDe" Capi's lines in German. "optionsDe" is the options in German, same order, for "mc" cards only; [] for every other format. Never let a translation give the answer away: in a "meaning" card keep the item in Portuguese inside «», and in a "cloze" card keep the ___.
+
 Tone: playful, warm, a bit cheeky. "capiRight" and "capiWrong" are Capi's Portuguese one-liners of at most 12 words, funny and never mean.
 
 Reply with ONLY a JSON array. Each card:
-{"kind":"spoken|grammar|vocab|bonus","topic":"...","format":"tf|mc|number|cloze|meaning|bonus","item":"...","de":"German meaning of the item","question":"...","options":["..."],"answer":0,"explain":"one or two short Portuguese sentences with the true fact","note":"in German: «item» = meaning, plus one usage hint","source":"...","capiRight":"...","capiWrong":"..."}`
+{"kind":"spoken|grammar|vocab|bonus","topic":"...","format":"tf|mc|number|cloze|meaning|bonus","item":"...","de":"German meaning of the item","question":"...","options":["..."],"answer":0,"explain":"one or two short Portuguese sentences with the true fact","note":"in German: «item» = meaning, plus one usage hint","source":"...","capiRight":"...","capiWrong":"...","questionDe":"...","optionsDe":[],"explainDe":"...","capiRightDe":"...","capiWrongDe":"..."}`
 
 // The batch to ask for. queue: cards already waiting; activity: what Claude is
 // busy with right now. Once today's new items are used up and nothing is due,
@@ -139,4 +141,17 @@ function isCard(c) {
   const n = c.options.length
   if (c.format === 'tf' ? n !== 2 : n < 3 || n > 4) return false
   return Number.isInteger(c.answer) && c.answer >= 0 && c.answer < n
+}
+
+// The German lines the translation toggle shows for a card at its stage. A card
+// made before translations existed has none, and then there is no toggle.
+export function germanLines(card, stage, quizOk) {
+  const lines = []
+  if (card.format === 'bonus' || stage === 'quiz') lines.push(card.questionDe)
+  if (stage === 'quiz' && card.format === 'mc' && Array.isArray(card.optionsDe) && card.optionsDe.length === card.options.length) {
+    lines.push(card.optionsDe.map((o, i) => `${i + 1}: ${o}`).join(' · '))
+  }
+  if (stage === 'reveal' && card.format !== 'bonus') lines.push(quizOk ? card.capiRightDe : card.capiWrongDe)
+  if (card.format === 'bonus' || stage === 'reveal') lines.push(card.explainDe)
+  return lines.filter(isText)
 }

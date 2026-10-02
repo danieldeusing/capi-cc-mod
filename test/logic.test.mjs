@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { replay, dueItems, newAllowance, levelFor, PLACEMENT_BOX, NEW_PER_DAY } from '../hooks/lib/srs.js'
 import { parseJsonl, toJsonl, merge, monthFile } from '../hooks/lib/log.js'
-import { buildRequest, parseCards, activityHint } from '../hooks/lib/cards.js'
+import { buildRequest, parseCards, activityHint, germanLines } from '../hooks/lib/cards.js'
 
 const MIN = 60_000
 const DAY = 86_400_000
@@ -149,4 +149,21 @@ test('the activity hint never carries an assignment, a path or an argument', () 
 test('history files are per Mac and month, in local time', () => {
   assert.equal(monthFile('ddStudio', Date.UTC(2026, 9, 1, 2, 0)), 'ddStudio-2026-09.jsonl') // still Sep 30 in Brazil
   assert.equal(monthFile('ddAir', T0), 'ddAir-2026-10.jsonl')
+})
+
+test('the translation toggle shows the question first, then the explanation', () => {
+  const c = card({
+    format: 'mc', options: ['a', 'b', 'c'], answer: 0,
+    questionDe: 'Nur Chile und Ecuador bleiben außen vor.', optionsDe: ['A', 'B', 'C'],
+    explainDe: 'Stimmt: 10 Nachbarn.', capiRightDe: 'Gut gemacht!', capiWrongDe: 'Fast!',
+  })
+  assert.deepEqual(germanLines(c, 'quiz'), ['Nur Chile und Ecuador bleiben außen vor.', '1: A · 2: B · 3: C'])
+  assert.deepEqual(germanLines(c, 'reveal', true), ['Gut gemacht!', 'Stimmt: 10 Nachbarn.'])
+  assert.deepEqual(germanLines(c, 'reveal', false), ['Fast!', 'Stimmt: 10 Nachbarn.'])
+  // options are only translated for mc, and only when the counts match
+  assert.deepEqual(germanLines({ ...c, optionsDe: ['A'] }, 'quiz'), ['Nur Chile und Ecuador bleiben außen vor.'])
+  assert.deepEqual(germanLines({ ...c, format: 'cloze' }, 'quiz'), ['Nur Chile und Ecuador bleiben außen vor.'])
+  const bonus = { format: 'bonus', questionDe: 'Warum…', explainDe: 'Weil…' }
+  assert.deepEqual(germanLines(bonus, 'quiz'), ['Warum…', 'Weil…'])
+  assert.deepEqual(germanLines(card(), 'quiz'), []) // a card from before translations
 })

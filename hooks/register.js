@@ -8,7 +8,7 @@
 
 import { replay, dayOf } from './lib/srs.js'
 import { parseJsonl, toJsonl, merge, monthFile } from './lib/log.js'
-import { buildRequest, parseCards, activityHint, ITEM_FORMATS } from './lib/cards.js'
+import { buildRequest, parseCards, activityHint, germanLines, ITEM_FORMATS } from './lib/cards.js'
 
 // The facts have to be TRUE, so batches go to Opus at high effort. They run in
 // the background while cards are still queued, so the latency costs nothing.
@@ -50,6 +50,8 @@ let refilling = false
 let recording = Promise.resolve()
 let syncTimer = null
 let armed = null
+// The card whose German translation is open in this session, if any.
+let translated = null
 let syncReport = 'not synced yet'
 let lastBatch = 'none yet'
 let failure = ''
@@ -107,6 +109,10 @@ export function register(on) {
       next: (id) => nextCard($, id),
       speak: () => speak($),
       flag: (id) => flag($, id),
+      translate: (id) => {
+        translated = translated === id ? null : id
+        $.ui.invalidate('ui.render')
+      },
     })
     return Box({ flexDirection: 'column', children: fit(parts, e.props.maxRows ?? 99, e.props.bodyColumns ?? 80) })
   })
@@ -159,17 +165,26 @@ function view(Box, Text, Button, act) {
     Button({ key: 'speak', label: '🔊 ouvir', hotkey: '8', plain: true, onPress: act.speak }),
     Button({ key: 'flag', label: flagLabel, hotkey: '9', plain: true, dimColor: Boolean(current.flagged), onPress: () => act.flag(id) }),
   ]
+  const german = germanLines(card, stage, current.quizOk)
+  if (german.length || translated === id) {
+    const open = translated === id
+    tools.unshift(
+      Button({ key: 'de', label: open ? '🇩🇪 esconder' : '🇩🇪 tradução', hotkey: '7', plain: true, onPress: () => act.translate(id) }),
+    )
+  }
+  // Asked for, so never dropped to save rows; cut to one line at worst.
+  const de = translated === id ? german.map((l) => text('🇩🇪 ' + l, { italic: true, dimColor: true })) : []
   const next = Button({ key: 'next', label: 'próxima', hotkey: '1', plain: true, onPress: () => act.next(id) })
   const note = text('📚 ' + card.note, { dimColor: true }, 1)
 
   if (card.format === 'bonus') {
-    return [head, text(ASK.bonus, { bold: true }), text(card.question), text(card.explain), note, row([next, ...tools])]
+    return [head, text(ASK.bonus, { bold: true }), text(card.question), text(card.explain), ...de, note, row([next, ...tools])]
   }
   if (stage === 'quiz') {
     const options = card.options.map((o, i) =>
       Button({ key: 'opt-' + i, label: o, hotkey: String(i + 1), plain: true, onPress: () => act.pick(id, i) }),
     )
-    return [head, text('❓ ' + ASK[card.format], { bold: true }), text(card.question), row([...options, ...tools])]
+    return [head, text('❓ ' + ASK[card.format], { bold: true }), text(card.question), ...de, row([...options, ...tools])]
   }
   const verdict = current.quizOk
     ? `✅ Certo! +${current.gain} · ${card.capiRight}`
@@ -185,6 +200,7 @@ function view(Box, Text, Button, act) {
     head,
     text(verdict, { color: current.quizOk ? 'green' : 'red' }),
     text(`${card.explain} (Fonte: ${card.source})`),
+    ...de,
     note,
     row([...ask, ...tools]),
   ]

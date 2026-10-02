@@ -213,3 +213,32 @@ test('a card that arrives after the turn ended shows while idle', async ($, on) 
   const ui = await $.ui.mount({ ...idle, surface: 'desktop' })
   expect(await ui.find({ type: 'Text', text: /ficam de fora/ })).toBeDefined()
 })
+
+test('🇩🇪 opens the translation under the card and closes it again', async ($, on) => {
+  const de = { questionDe: 'Nur Chile und Ecuador grenzen nicht an Brasilien.', explainDe: 'Stimmt: 10 Nachbarn.', capiRightDe: 'Gut gemacht!', capiWrongDe: 'Fast!' }
+  const { clock } = engine(on, [reply(five(card(de)))])
+  await start($, clock)
+  for (const surface of ['terminal', 'desktop'] as const) {
+    const ui = await $.ui.mount({ ...BAND, surface })
+    expect(await ui.find({ type: 'Text', text: /🇩🇪/ })).toBeUndefined()
+    await ui.press({ key: 'de' })
+    expect(await ui.find({ type: 'Text', text: /🇩🇪 Nur Chile und Ecuador/ })).toBeDefined()
+    await ui.press({ key: 'de' })
+    expect(await ui.find({ type: 'Text', text: /🇩🇪/ })).toBeUndefined()
+    await ui.unmount()
+  }
+  // open, answer: the reveal shows Capi's line and the explanation in German
+  const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+  await ui.press({ key: 'de' })
+  await clock.advance(1000)
+  await ui.press({ key: 'opt-0' })
+  expect(await ui.find({ type: 'Text', text: /🇩🇪 Gut gemacht!/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /🇩🇪 Stimmt: 10 Nachbarn/ })).toBeDefined()
+})
+
+test('a card made before translations has no 🇩🇪 button', async ($, on) => {
+  const { clock } = engine(on, [reply(five())])
+  await start($, clock)
+  const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+  expect(await ui.find({ key: 'de' })).toBeUndefined()
+})
