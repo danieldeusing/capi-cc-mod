@@ -36,7 +36,7 @@ the current card, and `/capi show` brings back a band you closed with ×.
 You need Claude Code 2.1.287 or later with mods turned on. To check, run
 `claude plugin test` in an empty directory: it must not say "turned off".
 
-There are two ways in: from [seedr](https://seedr.danieldeusing.de/plugin/capi)
+There are two ways in: from [seedr](https://seedr.danieldeusing.de/plugins/capi/)
 with one command, or from GitHub as a clone you keep up to date with `git pull`.
 
 ### From seedr
