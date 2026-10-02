@@ -153,20 +153,28 @@ test('a month file that cannot be read is never overwritten', async ($, on) => {
   expect((store.get('log:2026-10-02:sess1') as any[]).length).toBe(1)
 })
 
-test('a failed card request backs off instead of retrying in a loop', async ($, on) => {
-  const { model, store, clock, logs } = engine(on, [])
+test('an API error is retried after a minute, and the band says what happened', async ($, on) => {
+  const { model, clock, logs } = engine(on, [{ isAnswered: false, reason: 'api-error', status: 529, error: 'overloaded', usage: {} }])
   await start($, clock)
   expect(model.length).toBe(1)
-  expect((store.get('refill') as any)?.t).toBeDefined()
+  expect(logs.some((l) => l.includes('api-error 529 overloaded'))).toBe(true)
+  const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+  expect(await ui.find({ type: 'Text', text: /Capi tropeçou \(api-error 529 overloaded\)/ })).toBeDefined()
 
-  // a new turn and three minutes of polling: no second call inside the backoff
-  await $.turn.start({ text: 'again', turnId: 't2' })
-  await clock.advance(3 * 60_000)
+  await clock.advance(50_000)
   expect(model.length).toBe(1)
-  expect(logs.filter((l) => l.includes('keine Karten')).length).toBe(1)
+  await clock.advance(15_000)
+  expect(model.length).toBe(2)
+})
 
-  // after the backoff it tries again
-  await clock.advance(4 * 60_000)
+test('a reply that cost tokens but gave no cards waits six minutes, not a loop', async ($, on) => {
+  const { model, clock } = engine(on, [reply([]), reply([])])
+  await start($, clock)
+  expect(model.length).toBe(1)
+  await $.turn.start({ text: 'again', turnId: 't2' })
+  await clock.advance(5 * 60_000)
+  expect(model.length).toBe(1)
+  await clock.advance(2 * 60_000)
   expect(model.length).toBe(2)
 })
 

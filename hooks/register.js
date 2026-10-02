@@ -12,15 +12,18 @@ import { buildRequest, parseCards, activityHint, ITEM_FORMATS } from './lib/card
 
 // The facts have to be TRUE, so batches go to Opus at high effort. They run in
 // the background while cards are still queued, so the latency costs nothing.
-const GENERATE = { model: 'claude-opus-5-5', effort: 'high', maxTokens: 12000, timeoutMs: 300_000 }
+const GENERATE = { model: 'claude-opus-5-5', effort: 'high', maxTokens: 32000, timeoutMs: 300_000 }
 // A 🚩 asks whether one claim really is wrong: rare, and worth the most care.
 const CHECK = { model: 'claude-opus-5-5', effort: 'xhigh', maxTokens: 2000, timeoutMs: 300_000 }
 const BATCH = 10
 const REFILL_BELOW = 4
 const POLL_MS = 3000
 const SYNC_DELAY_MS = 5000
-// Covers one model call. A failed refill keeps the lock, so it is also the backoff.
+// Covers one model call. A failed refill keeps the lock, so it is also the backoff:
+// a reply that cost tokens but gave no cards waits the full time, while an API
+// error or a call cut short (both free) is retried after a minute.
 const REFILL_LOCK_MS = 6 * 60_000
+const RETRY_FREE_MS = 60_000
 // A press this soon after the card changed is the second half of a double press.
 const PRESS_GUARD_MS = 800
 const FLAG_CONFIRM_MS = 10_000
@@ -50,6 +53,7 @@ let syncTimer = null
 let armed = null
 let syncReport = 'not synced yet'
 let lastBatch = 'none yet'
+let failure = ''
 let effortRefused = false
 
 export function register(on) {
@@ -148,7 +152,12 @@ function view(Box, Text, Button, act) {
   const node = (n) => ({ node: n })
   const head = text(`🦫 Capi · ${s.level.name} · 🔥 ${s.streak} dia${s.streak === 1 ? '' : 's'} · combo x${s.combo}`, { dimColor: true }, 2)
   if (!current) {
-    return [head, text(refilling ? 'Capi está preparando cartas… ☕' : 'Capi está sem cartas. Já já tem mais!')]
+    const msg = refilling
+      ? 'Capi está preparando cartas… ☕'
+      : failure
+        ? `Capi tropeçou (${failure}). Já já tenta de novo.`
+        : 'Capi está sem cartas. Já já tem mais!'
+    return [head, text(msg)]
   }
   const { card, stage } = current
   const id = card.id
@@ -439,7 +448,7 @@ async function refill($) {
   if (queue.length >= REFILL_BELOW) return
   const now = await $.clock.now()
   const lock = (await $.store.get('refill')) ?? null
-  if (lock?.t && now - lock.t < REFILL_LOCK_MS) return
+  if (lock?.t && now - lock.t < (lock.wait ?? REFILL_LOCK_MS)) return
   // ponytail: set-then-read narrows two sessions starting at once to a tiny window; no compare-and-set exists.
   const mine = { t: now, by: `${sessionId}:${Math.random().toString(36).slice(2, 8)}` }
   await $.store.set('refill', mine)
@@ -454,10 +463,15 @@ async function refill($) {
     await $.store.set('refill', { ...mine, t: await $.clock.now() })
     const r = await complete($, GENERATE, req)
     if (!r.ok) {
+      const free = /^(api-error|aborted)/.test(r.reason)
+      const wait = free ? RETRY_FREE_MS : REFILL_LOCK_MS
+      await $.store.set('refill', { ...mine, t: await $.clock.now(), wait })
+      failure = r.reason
       lastBatch = `failed: ${r.reason}`
-      $.ui.log(`Capi bekam keine Karten (${r.reason}); nächster Versuch in ${REFILL_LOCK_MS / 60_000} Minuten`)
+      $.ui.log(`Capi bekam keine Karten (${r.reason}); nächster Versuch in ${wait / 60_000} Minute${wait === 60_000 ? '' : 'n'}`)
       return
     }
+    failure = ''
     const { cards, dropped } = parseCards(r.text, now)
     lastBatch = `${cards.length} of ${cards.length + dropped} cards usable (asked for ${req.count})`
     if (cards.length === 0) $.ui.log(`Capi bekam keine brauchbaren Karten: ${lastBatch}`)
@@ -476,8 +490,13 @@ async function refill($) {
 // One model call. Resolves to { ok, text } or { ok: false, reason }; never rejects.
 async function complete($, opts, req) {
   const base = { model: opts.model, system: req.system, prompt: req.prompt, maxTokens: opts.maxTokens, timeoutMs: opts.timeoutMs }
+  // An API error says its HTTP status and kind; the bare reason alone hides both.
   const answer = (r) =>
-    typeof r === 'string' ? { ok: true, text: r } : r?.isAnswered ? { ok: true, text: r.text } : { ok: false, reason: r?.reason ?? 'no answer' }
+    typeof r === 'string'
+      ? { ok: true, text: r }
+      : r?.isAnswered
+        ? { ok: true, text: r.text }
+        : { ok: false, reason: [r?.reason ?? 'no answer', r?.status, r?.error].filter((x) => x != null).join(' ') }
   if (!effortRefused) {
     try {
       return answer(await $.model.complete({ ...base, effort: opts.effort }))
