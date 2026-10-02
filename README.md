@@ -36,8 +36,9 @@ the current card, and `/capi show` brings back a band you closed with ×.
 You need Claude Code 2.1.287 or later with mods turned on. To check, run
 `claude plugin test` in an empty directory: it must not say "turned off".
 
-There are two ways in: from [seedr](https://seedr.danieldeusing.de/plugins/capi/)
-with one command, or from GitHub as a clone you keep up to date with `git pull`.
+Install it from [seedr](https://seedr.danieldeusing.de/plugins/capi/) or from
+GitHub. Both take the plugin from this repository. To work on Capi itself, use a
+clone instead.
 
 ### From seedr
 
@@ -50,11 +51,20 @@ This installs Capi as a Claude Code plugin and turns it on, for every project. A
 the band appears above the prompt and the first ten cards arrive within a minute
 or two.
 
-The plugin lands in `~/.claude/plugins/cache/capi/capi/<version>/`, and that is
-the folder your `.env` goes in (see [Configure](#configure)). A new version
+### From GitHub
+
+```bash
+claude plugin marketplace add danieldeusing/capi-cc-mod
+claude plugin install capi@capi
+```
+
+Start a new session, as above.
+
+Both ways put the plugin in `~/.claude/plugins/cache/capi/capi/<version>/`, and
+that is the folder your `.env` goes in (see [Configure](#configure)). A new version
 installs into a new folder, so keep a copy of your `.env`.
 
-### From GitHub
+### From a clone
 
 1. Clone the repository wherever you keep code:
 
@@ -86,8 +96,8 @@ iCloud Drive, under `capi/`.
 
 ## Configure
 
-Copy `.env.example` to `.env` in the plugin folder (your clone, or the seedr
-install folder above) and change what you like. Git
+Copy `.env.example` to `.env` in the plugin folder (the install folder above, or
+your clone) and change what you like. Git
 ignores `.env`. A missing file or key keeps the default shown in `.env.example`.
 Capi reads the file when a session starts, so open a new session (or run
 `/reload-plugins`) after a change.
@@ -102,6 +112,7 @@ Capi reads the file when a session starts, so open a new session (or run
 | `CAPI_PERSONS` | the rows of the conjugation table, separated by `\|` | `eu\|você\|ele/ela\|nós\|vocês` |
 | `CAPI_TENSES` | its columns, separated by `\|` | `presente\|pretérito perfeito\|pretérito imperfeito\|futuro\|subjuntivo presente` |
 | `CAPI_SHOW` | when the band is there: `always`, or `working` for only while Claude works | `always` |
+| `CAPI_NEW_PER_DAY` | new expressions a day at most; after that only reviews and bonus cards, and `0` means reviews only | `25` |
 
 An English speaker learning Portuguese, with cards about football and music:
 
@@ -125,8 +136,8 @@ them. The rest is untested beyond Portuguese.
   after 20 minutes in the other language format (the payback round).
 - **Placement**: during the first week, an expression you already know jumps
   straight to box 4.
-- **At most 10 new expressions a day**, across all sessions and both Macs. After
-  that, only reviews and bonus cards.
+- **At most 25 new expressions a day** (`CAPI_NEW_PER_DAY`), across all sessions
+  and both Macs. After that, only reviews and bonus cards.
 
 ## Models and cost
 

@@ -1,6 +1,6 @@
 {
   "name": "capi",
   "version": "0.1.0",
-  "description": "Capi teaches a language with real-world facts while Claude works",
+  "description": "Capi the capybara teaches you a language above the prompt, one real-world fact per card",
   "author": { "name": "Daniel Deusing" }
 }
