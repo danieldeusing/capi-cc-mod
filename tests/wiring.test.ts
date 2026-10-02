@@ -4,7 +4,7 @@ import { expect, mock, test } from 'claude-code/testing'
 
 const T0 = Date.UTC(2026, 9, 2, 15, 0)
 const HOME = '/Users/test'
-const DIR = HOME + '/Library/Mobile Documents/com~apple~CloudDocs/ptbr'
+const DIR = HOME + '/Library/Mobile Documents/com~apple~CloudDocs/capi'
 
 const card = (over: Record<string, unknown> = {}) => ({
   kind: 'spoken',
@@ -91,7 +91,7 @@ const textOf = (box: any, re: RegExp): any =>
   box?.type === 'Text' && re.test(words(box).join(' ')) ? box : (box?.children ?? []).map((c: any) => (typeof c === 'string' ? undefined : textOf(c, re))).find(Boolean)
 
 const BAND = {
-  plugin: 'ptbr',
+  plugin: 'capi',
   component: 'AbovePrompt',
   viewport: { columns: 120, rows: 40 },
   props: { hasSurvey: false, isWorking: true, maxRows: 20, bodyColumns: 120, scroll: { offset: 0, bodyRows: 20 }, view: {} },
@@ -265,16 +265,16 @@ test('short of width, actions keep icon and digit only, then the header and answ
   expect((await at(40, 4)).wrap).toBe('nowrap')
 })
 
-test('× hides the band in this session only, and /ptbr show brings it back', async ($, on) => {
+test('× hides the band in this session only, and /capi show brings it back', async ($, on) => {
   const { store, toasts, clock } = engine(on, [reply(five())])
   await start($, clock)
   const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
   await ui.press({ key: 'close' })
   expect(await ui.find({ key: 'opt-0' })).toBeUndefined()
   expect(await ui.find({ key: 'close' })).toBeUndefined()
-  expect(toasts.some((t) => t.includes('/ptbr show'))).toBe(true)
+  expect(toasts.some((t) => t.includes('/capi show'))).toBe(true)
   expect([...store.keys()].some((k) => /closed/.test(String(k)))).toBe(false) // nothing kept: a new session shows the band
-  const r = (await $.command.run({ command: 'ptbr', args: 'show' })) as any
+  const r = (await $.command.run({ command: 'capi', args: 'show' })) as any
   expect(r.text).toMatch(/back/)
   expect(await ui.find({ key: 'opt-0' })).toBeDefined()
 })

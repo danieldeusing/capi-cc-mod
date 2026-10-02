@@ -1,8 +1,9 @@
-# ptbr: Capi teaches Brazilian Portuguese while Claude works
+# Capi: learn a language while Claude works
 
 A Claude Code mod. While Claude thinks, Capi the capybara shows a quiz card in the
 band above your prompt. Every card teaches one true real-world fact and one
-Portuguese expression, with explanations in your own language. Answer with the
+expression in the language you learn (Brazilian Portuguese unless you
+[configure](#configure) another), with explanations in your own language. Answer with the
 digit keys (type the digit into the empty prompt) or by clicking.
 
 Capi remembers what you know. Expressions you miss come back sooner, expressions
@@ -23,11 +24,11 @@ Click – at the right end of the header to fold the band to that one line, and
 □ to open it again. The band remembers, also in new sessions.
 
 Click × next to it to hide Capi in this session. Only this session: a new
-session shows the band again, and `/ptbr show` brings it back right away.
+session shows the band again, and `/capi show` brings it back right away.
 
-`/ptbr` shows level, streak, points, what is due, and how the last sync and card
-generation went. It answers instantly, also while Claude works. `/ptbr skip` drops
-the current card, and `/ptbr show` brings back a band you closed with ×.
+`/capi` shows level, streak, points, what is due, and how the last sync and card
+generation went. It answers instantly, also while Claude works. `/capi skip` drops
+the current card, and `/capi show` brings back a band you closed with ×.
 
 ## Install
 
@@ -37,18 +38,18 @@ You need Claude Code 2.1.287 or later with mods turned on. To check, run
 1. Clone the repository wherever you keep code:
 
    ```bash
-   git clone https://github.com/danieldeusing/dd-ptbr-mod.git ~/dd-ptbr-mod
+   git clone https://github.com/danieldeusing/capi-cc-mod.git ~/capi-cc-mod
    ```
 
 2. Load it in every session, Desktop included, by adding its path to
    `~/.claude/settings.json` (keep any other keys you already have there):
 
    ```json
-   { "env": { "CLAUDE_CODE_PLUGIN_DIRS": "/Users/you/dd-ptbr-mod" } }
+   { "env": { "CLAUDE_CODE_PLUGIN_DIRS": "/Users/you/capi-cc-mod" } }
    ```
 
    Several mod folders go in the same value, separated by `:`. To try it in one
-   session only, start Claude Code with `claude --plugin-dir ~/dd-ptbr-mod`.
+   session only, start Claude Code with `claude --plugin-dir ~/capi-cc-mod`.
 
 3. Start a new session. Capi's band appears above the prompt and the first ten
    cards arrive within a minute or two.
@@ -58,7 +59,7 @@ A session that was already open before step 2 does not see the mod.
 folder, so open a new session.
 
 On a second Mac, repeat the three steps. Both Macs read and write the same history
-in iCloud Drive, under `ptbr/`.
+in iCloud Drive, under `capi/`.
 
 ## Configure
 
@@ -123,7 +124,7 @@ each panel).
 
 - `$.store` (`~/.claude/plugins/store/`): the shared card queue, whether the band
   is folded, and the answers not yet folded into the history file
-- `~/Library/Mobile Documents/com~apple~CloudDocs/ptbr/<Mac>-<YYYY-MM>.jsonl`: each
+- `~/Library/Mobile Documents/com~apple~CloudDocs/capi/<Mac>-<YYYY-MM>.jsonl`: each
   Mac's history, one file per month. Every Mac reads every file and writes only its
   own, through a temporary file and a rename, and never with fewer entries than
   it wrote before. Without iCloud Drive, Capi still works and keeps history on

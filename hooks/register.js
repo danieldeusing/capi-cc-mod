@@ -4,7 +4,7 @@
 //   $.store 'log:<day>:<session>'   this session's answers that day (one writer per key)
 //   $.store 'queue' / 'current'     the cards every session on this Mac shares
 //   $.store 'machine'               this Mac's name, fixed on first use
-//   iCloud ptbr/<Mac>-<YYYY-MM>.jsonl  each Mac's history per month; every Mac reads all
+//   iCloud capi/<Mac>-<YYYY-MM>.jsonl  each Mac's history per month; every Mac reads all
 
 import { replay, dayOf } from './lib/srs.js'
 import { parseJsonl, toJsonl, merge, monthFile } from './lib/log.js'
@@ -59,7 +59,7 @@ const RETRY_FREE_MS = 60_000
 const PRESS_GUARD_MS = 800
 const FLAG_CONFIRM_MS = 10_000
 const VOICE = 'Luciana'
-const ICLOUD = 'Library/Mobile Documents/com~apple~CloudDocs/ptbr'
+const ICLOUD = 'Library/Mobile Documents/com~apple~CloudDocs/capi'
 
 
 let home = ''
@@ -81,7 +81,7 @@ let open = null
 let verbTab = null
 // The band folded to its header line. Kept in $.store, so a new session opens it the same way.
 let minimized = false
-// The band closed with ×: this session only, so a new session or /ptbr show brings it back.
+// The band closed with ×: this session only, so a new session or /capi show brings it back.
 let closed = false
 let loading = null
 let syncReport = 'not synced yet'
@@ -101,15 +101,15 @@ export function register(on) {
     // Not awaited: a slow or offline iCloud must not hold up the first prompt.
     sync($).catch((err) => (syncReport = 'sync failed: ' + (err?.message ?? err)))
     await $.command.register({
-      name: 'ptbr',
-      description: 'Capi: your Portuguese progress (skip: next card)',
+      name: 'capi',
+      description: 'Capi: your progress (skip: next card, show: bring the band back)',
       argumentHint: '[skip|show]',
       immediate: true,
     })
     return next(e)
   })
 
-  on('command.run', { command: 'ptbr' }, async ($, e) => {
+  on('command.run', { command: 'capi' }, async ($, e) => {
     if (e.args.trim() === 'skip') {
       await advance($)
       return { text: 'Capi: card skipped' }
@@ -156,7 +156,7 @@ export function register(on) {
       close: () => {
         closed = true
         $.ui.invalidate('ui.render')
-        $.ui.toast('Capi is hidden in this session. /ptbr show brings it back.')
+        $.ui.toast('Capi is hidden in this session. /capi show brings it back.')
       },
       size: async () => {
         minimized = !minimized
