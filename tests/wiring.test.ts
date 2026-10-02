@@ -233,6 +233,31 @@ test('⌄ folds the band to its header line, ⌃ opens it again, and a new sessi
   expect(store.get('minimized')).toBe(false)
 })
 
+test('short of width, actions keep icon and digit only, then the header and answers wrap', async ($, on) => {
+  const { clock } = engine(on, [reply(five())])
+  await start($, clock)
+  const at = async (bodyColumns: number, maxRows = 20) => {
+    const ui = await $.ui.mount({ ...BAND, props: { ...BAND.props, bodyColumns, maxRows }, surface: 'desktop' })
+    const label = async (key: string) => ((await ui.find({ key })) as any).props
+    const root = (await ui.find({ type: 'Box' })) as any
+    const pairsBox = root.children[0].children[0].children[1]
+    return { gram: await label('gram'), speak: await label('speak'), flag: await label('flag'), wrap: pairsBox.props.flexWrap }
+  }
+  const wide = await at(200)
+  expect(wide.gram.label).toBe('📐 gramática')
+  expect(wide.speak.label).toBe('🔊 ouvir')
+  // 100 columns hold the question or the three labelled buttons, not both: those buttons lose their words
+  const medium = await at(100)
+  expect(medium.gram).toMatchObject({ label: '📐', hotkey: '6' })
+  expect(medium.speak.label).toBe('🔊 ouvir')
+  const narrow = await at(40)
+  expect(narrow.speak).toMatchObject({ label: '🔊', hotkey: '8' })
+  expect(narrow.flag).toMatchObject({ label: '🚩', hotkey: '9' })
+  expect(narrow.wrap).toBe('wrap') // the header's pairs go onto more lines
+  // a band too short for that cuts lines instead of wrapping them
+  expect((await at(40, 4)).wrap).toBe('nowrap')
+})
+
 test('a band folded in another session opens folded', async ($, on) => {
   const { store, clock } = engine(on, [reply(five())])
   store.set('minimized', true)

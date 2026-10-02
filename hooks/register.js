@@ -11,6 +11,7 @@ import { parseJsonl, toJsonl, merge, monthFile } from './lib/log.js'
 import { buildRequest, parseCards, activityHint, germanLines, headerParts, translationRequest, parseTranslation, ITEM_FORMATS } from './lib/cards.js'
 import { grammarRequest, parseGrammar, grammarLines, conjugationRequest, parseConjugation, conjugationTables, fitsTable } from './lib/extras.js'
 import { configFrom, parseEnv, DEFAULT_CONFIG } from './lib/config.js'
+import { cells } from './lib/cells.js'
 
 // The one horizontal space between things side by side: pairs, buttons, tabs.
 const GAP = 2
@@ -134,7 +135,7 @@ export function register(on) {
     // answering pulls new cards, so a visible band never costs a model call.
     if (e.props.hasSurvey) return next(e)
     const { Box, Text, Button } = $.ui.resolve(e)
-    const parts = view(Box, Text, Button, {
+    const parts = view(Box, Text, Button, (e.props.bodyColumns ?? 80) - ICON_W, {
       pick: (id, i) => pick($, id, i),
       grade: (id, ok) => grade($, id, ok),
       next: (id) => nextCard($, id),
@@ -187,7 +188,7 @@ async function machineName($) {
 
 // Parts of the card: { make(cut) } for text that may be cut to one line,
 // { node } otherwise. `drop` marks what goes first when the band is short.
-function view(Box, Text, Button, act) {
+function view(Box, Text, Button, cols, act) {
   const s = state
   const text = (t, props = {}, drop = 0) => ({
     text: t,
@@ -202,13 +203,18 @@ function view(Box, Text, Button, act) {
   // the card (categoria, tipo, pergunta), then the learner. 📐 🔤 🇩🇪
   // sit at its right end and never shrink; the values give way first.
   const { card: cardPairs, learner } = headerParts(current?.card, s)
-  const pair = ([k, v]) =>
-    Box({ flexDirection: 'row', columnGap: 1, flexShrink: 1, children: [Text({ dimColor: true, children: [k] }), Text({ wrap: 'truncate-end', children: [v] })] })
+  const pairs = [...cardPairs, ...learner]
+  // Too wide for one line beside the toggle: the pairs wrap onto more lines, unless the band is short.
+  const pairsWidth = pairs.reduce((n, [k, v]) => n + cells(k) + 1 + cells(v), 0) + GAP * (pairs.length - 1)
+  const headRows = Math.max(1, Math.ceil(pairsWidth / Math.max(cols - GAP - 1, 20)))
+  const pair = ([k, v], cut) =>
+    Box({ flexDirection: 'row', columnGap: 1, flexShrink: 1, children: [Text({ dimColor: true, children: [k] }), Text({ wrap: cut ? 'truncate-end' : 'wrap', children: [v] })] })
   const head = {
     flush: true,
-    text: '', // always one row
+    text: '',
+    rows: headRows,
     drop: 0,
-    make: (_cut, side) =>
+    make: (cut, side) =>
       Box({
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -217,7 +223,7 @@ function view(Box, Text, Button, act) {
           Box({
             flexDirection: 'row',
             flexShrink: 1,
-            children: [icon('🦫'), Box({ flexDirection: 'row', columnGap: GAP, flexShrink: 1, children: [...cardPairs, ...learner].map(pair) })],
+            children: [icon('🦫'), Box({ flexDirection: 'row', flexWrap: cut ? 'nowrap' : 'wrap', columnGap: GAP, flexShrink: 1, children: pairs.map((p) => pair(p, cut)) })],
           }),
           ...(side ? [Box({ flexShrink: 0, children: [side] })] : []),
         ],
@@ -240,37 +246,54 @@ function view(Box, Text, Button, act) {
   const { card, stage } = current
   const id = card.id
   // Answers on the left; 🔊 and 🚩 on the right, in line with them.
-  const row = (children) => ({
-    icon: '👉',
-    buttons: true,
-    ...node(
-      Box({
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        flexGrow: 1, // the whole width after the icon column, so 🔊 🚩 reach the right edge
-        children: [
-          Box({ flexDirection: 'row', columnGap: GAP, children }),
-          Box({ flexDirection: 'row', columnGap: GAP, children: tools }),
-        ],
-      }),
-    ),
-  })
+  // Answers on the left; 🔊 and 🚩 on the right. Short of room, 🔊 and 🚩 drop their words;
+  // shorter still, the answers wrap onto more lines.
+  const row = (children) => {
+    const compact = widthOf(children) + GAP + widthOf(tools(false)) > cols
+    const right = tools(compact)
+    const rows = Math.max(1, Math.ceil(widthOf(children) / Math.max(cols - GAP - widthOf(right), 10)))
+    return {
+      icon: '👉',
+      buttons: true,
+      rows,
+      ...node(
+        Box({
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          columnGap: GAP,
+          flexGrow: 1, // the whole width after the icon column, so 🔊 🚩 reach the right edge
+          children: [
+            Box({ flexDirection: 'row', flexWrap: 'wrap', columnGap: GAP, flexShrink: 1, children }),
+            Box({ flexDirection: 'row', columnGap: GAP, flexShrink: 0, children: right }),
+          ],
+        }),
+      ),
+    }
+  }
   // A blank line between the blocks of the card. Always kept: when the band is
   // short the note goes and texts are cut instead.
   const gap = { text: '', drop: 0, flush: true, make: () => Text({ children: [' '] }) }
   const flagLabel = current.flagged ? '🚩 marcado' : armed?.id === id ? '🚩 de novo = confirmar' : '🚩 tá errado?'
-  const tools = [
-    Button({ key: 'speak', label: '🔊 ouvir', hotkey: '8', plain: true, onPress: act.speak }),
-    Button({ key: 'flag', label: flagLabel, hotkey: '9', plain: true, dimColor: Boolean(current.flagged), onPress: () => act.flag(id) }),
+  // compact: the icon alone, keeping the hotkey digit
+  const tools = (compact) => [
+    Button({ key: 'speak', label: compact ? '🔊' : '🔊 ouvir', hotkey: '8', plain: true, onPress: act.speak }),
+    Button({ key: 'flag', label: compact ? '🚩' : flagLabel, hotkey: '9', plain: true, dimColor: Boolean(current.flagged), onPress: () => act.flag(id) }),
   ]
-  const extraButtons = Object.entries(EXTRAS).map(([kind, x]) => {
-    const isOpen = open?.id === id && open.kind === kind
-    const label = loading?.id === id && loading.kind === kind ? `${x.icon} …` : isOpen ? `${x.icon} fechar` : `${x.icon} ${x.name}`
-    return Button({ key: kind, label, hotkey: x.hotkey, plain: true, onPress: () => act.extra(id, kind) })
-  })
-  // 📐 🔤 🇩🇪 sit at the right end of the card's first line: the question, or the verdict once answered.
-  const panelButtons = Box({ flexDirection: 'row', columnGap: GAP, children: extraButtons })
-  const question = { ...text(card.question, { bold: true }), icon: '❓', side: panelButtons }
+  const extraButtons = (compact) =>
+    Object.entries(EXTRAS).map(([kind, x]) => {
+      const isOpen = open?.id === id && open.kind === kind
+      const busy = loading?.id === id && loading.kind === kind
+      const label = busy ? `${x.icon} …` : compact ? x.icon : isOpen ? `${x.icon} fechar` : `${x.icon} ${x.name}`
+      return Button({ key: kind, label, hotkey: x.hotkey, plain: true, onPress: () => act.extra(id, kind) })
+    })
+  // 📐 🔤 🇩🇪 sit at the right end of the card's first line: the question, or the verdict once
+  // answered. Short of room they drop their words; shorter still, the line's text wraps.
+  const panelButtons = (line) => {
+    const compact = cells(line) + GAP + widthOf(extraButtons(false)) > cols
+    return Box({ flexDirection: 'row', columnGap: GAP, children: extraButtons(compact) })
+  }
+  const question = { ...text(card.question, { bold: true }), icon: '❓', side: panelButtons(card.question) }
   // Asked for, so never dropped to save rows; cut to one line at worst.
   const x = open?.id === id ? EXTRAS[open.kind] : null
   const extra = !x
@@ -307,7 +330,7 @@ function view(Box, Text, Button, act) {
   return [
     top,
     gap,
-    { ...text(verdict, { color: current.quizOk ? 'green' : 'red' }), icon: current.quizOk ? '✅' : '❌', side: panelButtons },
+    { ...text(verdict, { color: current.quizOk ? 'green' : 'red' }), icon: current.quizOk ? '✅' : '❌', side: panelButtons(verdict) },
     text(`${card.explain} (Fonte: ${card.source})`),
     ...panel,
     note,
@@ -350,6 +373,14 @@ function tables(Box, Text, Button, list, selected, choose) {
   return [{ node: Box({ flexDirection: 'row', columnGap: GAP, children: [tabs, table] }), rows: Math.max(list.length, t.rows.length + 1) }]
 }
 
+// The cells a row of elements takes: Text by its words, a Button by its label
+// plus the hotkey digit and its mark, and GAP between them.
+function widthOf(list) {
+  const one = (el) =>
+    el?.type === 'Button' ? cells(el.props?.label) + (el.props?.hotkey ? 3 : 0) : cells((el?.children ?? []).filter((c) => typeof c === 'string').join(''))
+  return list.reduce((n, el) => n + one(el), 0) + GAP * Math.max(0, list.length - 1)
+}
+
 // Everything under the header starts where the header's text does: after the
 // icon column. Each block names itself there: 🦫 the header, ❓ the question,
 // 📐 🔤 🇩🇪 an open panel (on its first line), ✅ ❌ the verdict, 📚 the note,
@@ -373,7 +404,7 @@ function indent(Box, Text, p, surface) {
 // So: drop the note, then cut every text to one line. Blank lines, the header
 // and an open panel stay.
 function fit(parts, maxRows, cols) {
-  const rows = (p, cut) => p.rows ?? (p.make && !cut ? Math.max(1, Math.ceil(p.text.length / Math.max(cols, 20))) : 1)
+  const rows = (p, cut) => (p.make ? (cut ? 1 : (p.rows ?? Math.max(1, Math.ceil(p.text.length / Math.max(cols, 20))))) : (p.rows ?? 1))
   const height = (list, cut) => list.reduce((n, p) => n + rows(p, cut), 0)
   let keep = parts
   for (const level of [1, 2]) if (height(keep, false) > maxRows) keep = keep.filter((p) => p.drop !== level)

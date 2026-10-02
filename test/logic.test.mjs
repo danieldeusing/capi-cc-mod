@@ -5,6 +5,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { replay, dueItems, newAllowance, levelFor, PLACEMENT_BOX, NEW_PER_DAY } from '../hooks/lib/srs.js'
 import { parseJsonl, toJsonl, merge, monthFile } from '../hooks/lib/log.js'
+import { cells } from '../hooks/lib/cells.js'
 import { buildRequest, parseCards, activityHint, germanLines, parseTranslation, translationRequest } from '../hooks/lib/cards.js'
 
 const MIN = 60_000
@@ -240,4 +241,13 @@ test('the settings file is read plainly, and every prompt follows it', async () 
   const s = replay([], T0)
   const req = buildRequest({ now: T0, state: s, queue: [], activity: [], total: 10, cfg: configFrom({ CAPI_TOPICS: 'football and music' }) })
   assert.match(req.prompt, /Spread the facts across: football and music\./)
+})
+
+test('screen width in cells: an emoji or a flag two, accents and variation selectors none', () => {
+  assert.equal(cells('📐 gramática'), 12)
+  assert.equal(cells('🇩🇪'), 2)
+  assert.equal(cells('❤️'), 2)
+  assert.equal(cells('conjugação'), 10)
+  assert.equal(cells('é'), 1) // e + a combining accent
+  assert.equal(cells(undefined), 0)
 })
