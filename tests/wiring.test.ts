@@ -222,7 +222,7 @@ test('⌄ folds the band to its header line, › opens it again, and a new sessi
   await start($, clock)
   const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
   const toggle = (await ui.find({ key: 'size' })) as any
-  expect(toggle.props.label).toBe('\u00a0\u00a0\u00a0') // Desktop draws the chevron under a blank button of no-break spaces
+  expect(toggle.props.label).toBe('\u2003\u2003') // Desktop draws the chevron under a blank button two em spaces wide
   // the button is positioned and comes after the drawing, so it is painted on top and takes the click
   const header = ((await ui.find({ type: 'Box' })) as any).children[0]
   const wrap = header.children[1].children[0].children[0]
