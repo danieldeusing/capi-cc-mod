@@ -223,26 +223,21 @@ function view(Box, Text, Button, act) {
         ],
       }),
   }
-  // The fold toggle is a grey text arrow alone, like the hotkey digits: no emoji, no hotkey, no word.
-  const size = Button({ key: 'size', label: minimized ? '▴' : '▾', plain: true, dimColor: true, onPress: act.size })
+  // The fold toggle is a grey chevron alone, like the app's own chips: no emoji, no hotkey, no word.
+  const size = Button({ key: 'size', label: minimized ? '⌃' : '⌄', plain: true, dimColor: true, onPress: act.size })
+  // The header line: the pairs, and the fold toggle alone at its right end.
+  const top = { ...head, make: (cut) => head.make(cut, size) }
   // Folded, or with no card yet: the header line with 🔼/🔽 alone at its right.
   if (minimized || !current) {
-    const bar = { ...head, make: (cut) => head.make(cut, size) }
-    if (minimized) return [bar]
+    if (minimized) return [top]
     const msg = refilling
       ? 'Capi está preparando cartas… ☕'
       : failure
         ? `Capi tropeçou (${failure}). Já já tenta de novo.`
         : 'Capi está sem cartas. Já já tem mais!'
-    return [bar, text(msg)]
+    return [top, text(msg)]
   }
   const { card, stage } = current
-  const question = {
-    flush: true,
-    text: '❓ ' + card.question,
-    drop: 0,
-    make: (cut) => Box({ flexDirection: 'row', alignItems: 'flex-start', children: [icon('❓'), Text({ bold: true, wrap: cut ? 'truncate-end' : 'wrap', children: [card.question] })] }),
-  }
   const id = card.id
   // Answers on the left; 🔊 and 🚩 on the right, in line with them.
   const row = (children) => ({
@@ -273,13 +268,9 @@ function view(Box, Text, Button, act) {
     const label = loading?.id === id && loading.kind === kind ? `${x.icon} …` : isOpen ? `${x.icon} fechar` : `${x.icon} ${x.name}`
     return Button({ key: kind, label, hotkey: x.hotkey, plain: true, onPress: () => act.extra(id, kind) })
   })
-  // 📐 🔤 🇩🇪 sit at the right end of the header's first line.
-  const top = {
-    flush: true,
-    text: head.text,
-    drop: 0,
-    make: (cut) => head.make(cut, Box({ flexDirection: 'row', columnGap: GAP, children: [...extraButtons, size] })),
-  }
+  // 📐 🔤 🇩🇪 sit at the right end of the card's first line: the question, or the verdict once answered.
+  const panelButtons = Box({ flexDirection: 'row', columnGap: GAP, children: extraButtons })
+  const question = { ...text(card.question, { bold: true }), icon: '❓', side: panelButtons }
   // Asked for, so never dropped to save rows; cut to one line at worst.
   const x = open?.id === id ? EXTRAS[open.kind] : null
   const extra = !x
@@ -316,7 +307,7 @@ function view(Box, Text, Button, act) {
   return [
     top,
     gap,
-    { ...text(verdict, { color: current.quizOk ? 'green' : 'red' }), icon: current.quizOk ? '✅' : '❌' },
+    { ...text(verdict, { color: current.quizOk ? 'green' : 'red' }), icon: current.quizOk ? '✅' : '❌', side: panelButtons },
     text(`${card.explain} (Fonte: ${card.source})`),
     ...panel,
     note,
@@ -369,7 +360,12 @@ function indent(Box, Text, p, surface) {
   // row that starts with buttons takes that cell from the icon column.
   const width = ICON_W - (p.buttons && surface !== 'terminal' ? 1 : 0)
   const column = Box({ width, flexShrink: 0, children: p.icon ? [Text({ children: [p.icon] })] : [] })
-  const shift = (n) => Box({ flexDirection: 'row', alignItems: 'flex-start', children: [column, Box({ flexDirection: 'row', flexGrow: 1, flexShrink: 1, children: [n] })] })
+  // p.side sits at the right end of the block's first line, and never shrinks
+  const body = (n) =>
+    p.side
+      ? Box({ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', columnGap: GAP, flexGrow: 1, children: [Box({ flexShrink: 1, children: [n] }), Box({ flexShrink: 0, children: [p.side] })] })
+      : n
+  const shift = (n) => Box({ flexDirection: 'row', alignItems: 'flex-start', children: [column, Box({ flexDirection: 'row', flexGrow: 1, flexShrink: 1, children: [body(n)] })] })
   return p.node ? { ...p, node: shift(p.node) } : { ...p, make: (cut) => shift(p.make(cut)) }
 }
 

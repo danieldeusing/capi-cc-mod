@@ -82,6 +82,10 @@ function engine(on: any, replies: unknown[], files = new Map<string, string>(), 
 // every string under a node, in drawing order
 const words = (box: any): string[] => (box.children ?? []).flatMap((c: any) => (typeof c === 'string' ? [c] : words(c)))
 
+// the first Text under a node whose words match
+const textOf = (box: any, re: RegExp): any =>
+  box?.type === 'Text' && re.test(words(box).join(' ')) ? box : (box?.children ?? []).map((c: any) => (typeof c === 'string' ? undefined : textOf(c, re))).find(Boolean)
+
 const BAND = {
   plugin: 'ptbr',
   component: 'AbovePrompt',
@@ -209,12 +213,12 @@ test('the band follows the card another session moved to', async ($, on) => {
   expect(await ui.find({ type: 'Text', text: /Carta da outra sessão/ })).toBeDefined()
 })
 
-test('▾ folds the band to its header line, ▴ opens it again, and a new session remembers', async ($, on) => {
+test('⌄ folds the band to its header line, ⌃ opens it again, and a new session remembers', async ($, on) => {
   const { store, clock } = engine(on, [reply(five())])
   await start($, clock)
   const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
   const toggle = (await ui.find({ key: 'size' })) as any
-  expect(toggle.props.label).toBe('▾') // a text arrow alone, grey like the hotkey digits
+  expect(toggle.props.label).toBe('⌄') // a chevron alone, grey like the app's own chips
   expect(toggle.props.dimColor).toBe(true)
   expect(toggle.props.hotkey).toBeUndefined()
   await ui.press({ key: 'size' })
@@ -222,7 +226,7 @@ test('▾ folds the band to its header line, ▴ opens it again, and a new sessi
   expect(folded.children.length).toBe(1) // the header line alone
   expect(await ui.find({ key: 'opt-0' })).toBeUndefined()
   expect(await ui.find({ key: 'gram' })).toBeUndefined()
-  expect(await ui.find({ key: 'size' })).toMatchObject({ props: { label: '▴' } })
+  expect(await ui.find({ key: 'size' })).toMatchObject({ props: { label: '⌃' } })
   expect(store.get('minimized')).toBe(true)
   await ui.press({ key: 'size' })
   expect(await ui.find({ key: 'opt-0' })).toBeDefined()
@@ -235,7 +239,7 @@ test('a band folded in another session opens folded', async ($, on) => {
   await start($, clock)
   const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
   expect(await ui.find({ key: 'opt-0' })).toBeUndefined()
-  expect(await ui.find({ key: 'size' })).toMatchObject({ props: { label: '▴' } })
+  expect(await ui.find({ key: 'size' })).toMatchObject({ props: { label: '⌃' } })
 })
 
 test('a card that arrives after the turn ended shows while idle', async ($, on) => {
@@ -323,17 +327,21 @@ test('📐 🔤 🇩🇪 sit top right, 🇩🇪 on key 0, 🔊 🚩 bottom righ
     // header: ONE line, the card's pairs then the learner's, with 📐 🔤 🇩🇪 at its right
     const header = root0.children[0]
     expect(header.props.justifyContent).toBe('space-between')
-    expect(header.children[1].children[0].children.map((c: any) => c.props.key)).toEqual(['gram', 'conj', 'de', 'size'])
+    expect(header.children[1].children.map((c: any) => c.props.key)).toEqual(['size']) // the fold toggle alone at the header's right
     expect(words(header.children[0])).toEqual(['🦫', 'categoria', 'brasil', 'tipo', 'Fala', 'pergunta', 'Verdade ou mentira', 'nível', 'Turista 0/50', 'sequência', '0 dias', 'combo', '0'])
     expect(words(root0.children[0]).join(' ')).not.toMatch(/[·│|]/) // one structure: no separators
     // labels dim, every value and the question at full strength, the question bold
     const values = header.children[0].children[1].children.map((p: any) => p.children[1].props)
     expect(values.every((v: any) => !v.dimColor)).toBe(true)
     expect(header.children[0].children[1].children.every((p: any) => p.children[0].props.dimColor)).toBe(true)
-    // the question, under the blank line: ❓ in the same icon column as the header's 🦫
-    const [qIcon, qText] = root0.children[2].children
+    // the question, under the blank line: ❓ in the same icon column as the header's 🦫,
+    // 📐 🔤 🇩🇪 at the right end of its line
+    const [qIcon, qBody] = root0.children[2].children
+    const qRow = qBody.children[0]
     expect(words(qIcon)).toEqual(['❓'])
-    expect(qText.props.bold).toBe(true)
+    expect(qRow.props.justifyContent).toBe('space-between')
+    expect(textOf(qRow, /ficam de fora/).props.bold).toBe(true)
+    expect(qRow.children[1].children[0].children.map((c: any) => c.props.key)).toEqual(['gram', 'conj', 'de'])
     expect(qIcon.props.width).toBe(header.children[0].children[0].props.width)
     expect(words(header.children[0].children[0])).toEqual(['🦫'])
     // the question type lives in the header now, not above the question
@@ -430,7 +438,7 @@ test('🔤 shows one verb at a time in tabs, and an open panel stands apart from
   const question = async (maxRows: number) => {
     const band = await $.ui.mount({ ...BAND, props: { ...BAND.props, maxRows }, surface: 'desktop' })
     const r = (await band.find({ type: 'Box' })) as any
-    return r.children.find((c: any) => /ficam de fora/.test(words(c).join(' '))).children[1].props.wrap
+    return textOf(r, /ficam de fora/).props.wrap
   }
   expect(await question(11)).toBe('truncate-end')
   expect(await question(12)).toBe('wrap')
