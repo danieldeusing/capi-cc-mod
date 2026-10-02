@@ -1,0 +1,15 @@
+{
+  "name": "capi",
+  "owner": { "name": "Daniel Deusing" },
+  "metadata": {
+    "description": "Capi, a Claude Code mod that teaches a language above the prompt"
+  },
+  "plugins": [
+    {
+      "name": "capi",
+      "source": "./",
+      "description": "Capi teaches a language with real-world facts while Claude works",
+      "author": { "name": "Daniel Deusing" }
+    }
+  ]
+}
