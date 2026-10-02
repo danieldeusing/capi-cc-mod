@@ -230,7 +230,7 @@ function view(Box, Text, Button, cols, act) {
       }),
   }
   // The fold toggle is a grey chevron alone, like the app's own chips: no emoji, no hotkey, no word.
-  const size = Button({ key: 'size', label: minimized ? '⌃' : '⌄', plain: true, dimColor: true, onPress: act.size })
+  const size = Button({ key: 'size', label: minimized ? '⌃' : '∨', plain: true, dimColor: true, onPress: act.size })
   // The header line: the pairs, and the fold toggle alone at its right end.
   const top = { ...head, make: (cut) => head.make(cut, size) }
   // Folded, or with no card yet: the header line with 🔼/🔽 alone at its right.

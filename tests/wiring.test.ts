@@ -213,12 +213,12 @@ test('the band follows the card another session moved to', async ($, on) => {
   expect(await ui.find({ type: 'Text', text: /Carta da outra sessão/ })).toBeDefined()
 })
 
-test('⌄ folds the band to its header line, ⌃ opens it again, and a new session remembers', async ($, on) => {
+test('∨ folds the band to its header line, ⌃ opens it again, and a new session remembers', async ($, on) => {
   const { store, clock } = engine(on, [reply(five())])
   await start($, clock)
   const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
   const toggle = (await ui.find({ key: 'size' })) as any
-  expect(toggle.props.label).toBe('⌄') // a chevron alone, grey like the app's own chips
+  expect(toggle.props.label).toBe('∨') // a chevron alone, grey like the app's own chips
   expect(toggle.props.dimColor).toBe(true)
   expect(toggle.props.hotkey).toBeUndefined()
   await ui.press({ key: 'size' })
