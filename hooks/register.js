@@ -43,6 +43,9 @@ let home = ''
 let machine = ''
 let sessionId = 'session'
 let working = false
+// Background work (shells, subagents, monitors) still running when the last
+// turn ended: waiting on it is waiting too, so the band stays.
+let background = 0
 let entries = []
 let state = replay([], 0)
 let current = null
@@ -93,6 +96,15 @@ export function register(on) {
   })
 
   // A subagent's turn ends inside the main turn; only the main one stops the band.
+  // The engine lists the work still in flight when a turn stops. A finished task
+  // wakes the session, and that turn's Stop brings the list up to date.
+  on('classic.Stop', async ($, e, next) => {
+    background = Array.isArray(e.background_tasks) ? e.background_tasks.length : 0
+    if (background > 0 && !current) await advance($)
+    $.ui.invalidate('ui.render')
+    return next(e)
+  })
+
   on('turn.complete', async ($, e, next) => {
     if (e.agentId) return next(e)
     working = false
@@ -107,9 +119,9 @@ export function register(on) {
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
-    if (!e.props.isWorking || e.props.hasSurvey) return next(e)
+    if (!(e.props.isWorking || background > 0) || e.props.hasSurvey) return next(e)
     const { Box, Text, Button } = $.ui.resolve(e)
-    const parts = view(Box, Text, Button, {
+    const parts = view(Box, Text, Button, e.props.isWorking ? 0 : background, {
       pick: (id, i) => pick($, id, i),
       grade: (id, ok) => grade($, id, ok),
       next: (id) => nextCard($, id),
@@ -142,7 +154,7 @@ async function machineName($) {
 
 // Parts of the card: { make(cut) } for text that may be cut to one line,
 // { node } otherwise. `drop` marks what goes first when the band is short.
-function view(Box, Text, Button, act) {
+function view(Box, Text, Button, waiting, act) {
   const s = state
   const text = (t, props = {}, drop = 0) => ({
     text: t,
@@ -150,7 +162,8 @@ function view(Box, Text, Button, act) {
     make: (cut) => Text({ ...props, wrap: cut ? 'truncate-end' : 'wrap', children: [t] }),
   })
   const node = (n) => ({ node: n })
-  const head = text(`🦫 Capi · ${s.level.name} · 🔥 ${s.streak} dia${s.streak === 1 ? '' : 's'} · combo x${s.combo}`, { dimColor: true }, 2)
+  const tasks = waiting ? ` · ⏳ ${waiting} tarefa${waiting === 1 ? '' : 's'} rodando` : ''
+  const head = text(`🦫 Capi · ${s.level.name} · 🔥 ${s.streak} dia${s.streak === 1 ? '' : 's'} · combo x${s.combo}${tasks}`, { dimColor: true }, 2)
   if (!current) {
     const msg = refilling
       ? 'Capi está preparando cartas… ☕'
@@ -521,7 +534,7 @@ async function complete($, opts, req) {
 
 // Follows the card another session moved to, and keeps cards coming.
 async function poll($) {
-  if (!working) return
+  if (!working && background === 0) return
   const shared = (await $.store.get('current')) ?? null
   const key = (c) => (c ? `${c.card.id}:${c.stage}:${c.flagged ? 1 : 0}` : '')
   if (key(shared) !== key(current)) {

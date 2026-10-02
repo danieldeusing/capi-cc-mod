@@ -1,9 +1,10 @@
 # ptbr: Capi teaches Brazilian Portuguese while Claude works
 
-A Claude Code mod. While a turn runs, Capi the capybara shows a quiz card in the
-band above the prompt. Every card teaches one true real-world fact and one
-Portuguese expression, with German explanations. Answer with the digit keys
-(type the digit into the empty prompt) or by clicking.
+A Claude Code mod. While Claude works, and while background tasks it started are
+still running, Capi the capybara shows a quiz card in the band above the prompt.
+Every card teaches one true real-world fact and one Portuguese expression, with
+German explanations. Answer with the digit keys (type the digit into the empty
+prompt) or by clicking.
 
 | key | does |
 | --- | --- |
