@@ -143,7 +143,7 @@ export function register(on) {
         $.ui.invalidate('ui.render')
       },
     })
-    const body = parts.map((p) => (p.flush ? p : indent(Box, Text, p)))
+    const body = parts.map((p) => (p.flush ? p : indent(Box, Text, p, e.surface)))
     return Box({ flexDirection: 'column', children: fit(body, e.props.maxRows ?? 99, (e.props.bodyColumns ?? 80) - ICON_W) })
   })
 }
@@ -234,6 +234,7 @@ function view(Box, Text, Button, act) {
   // Answers on the left; 🔊 and 🚩 on the right, in line with them.
   const row = (children) => ({
     icon: '👉',
+    buttons: true,
     ...node(
       Box({
         flexDirection: 'row',
@@ -347,8 +348,11 @@ function tables(Box, Text, Button, list, selected, choose) {
 // 📐 🔤 🇩🇪 an open panel (on its first line), ✅ ❌ the verdict, 📚 the note,
 // 👉 the answers. Parts marked flush draw the column themselves or are blank.
 const ICON_W = 2 + GAP
-function indent(Box, Text, p) {
-  const column = Box({ width: ICON_W, flexShrink: 0, children: p.icon ? [Text({ children: [p.icon] })] : [] })
+function indent(Box, Text, p, surface) {
+  // A Desktop button draws its own padding, about a cell, before its hotkey;
+  // a row that starts with buttons takes that cell from the icon column.
+  const width = ICON_W - (p.buttons && surface !== 'terminal' ? 1 : 0)
+  const column = Box({ width, flexShrink: 0, children: p.icon ? [Text({ children: [p.icon] })] : [] })
   const shift = (n) => Box({ flexDirection: 'row', alignItems: 'flex-start', children: [column, Box({ flexDirection: 'row', flexGrow: 1, flexShrink: 1, children: [n] })] })
   return p.node ? { ...p, node: shift(p.node) } : { ...p, make: (cut) => shift(p.make(cut)) }
 }

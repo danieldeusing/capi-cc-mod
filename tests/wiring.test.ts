@@ -281,6 +281,9 @@ test('📐 🔤 🇩🇪 sit top right, 🇩🇪 on key 0, 🔊 🚩 bottom righ
     // the answers, indented to the text column with 👉 in the icon column
     const answers = root0.children[root0.children.length - 1]
     expect(words(answers.children[0])).toEqual(['👉'])
+    // a Desktop button pads itself by a cell, so there the icon column gives that cell back
+    expect(answers.children[0].props.width).toBe(surface === 'terminal' ? 4 : 3)
+    expect(root0.children[2].children[0].props.width).toBe(4) // the question's icon column
     const bar = answers.children[1].children[0]
     // 🔊 🚩 at the right edge: the text column fills the row and the bar fills the text column
     expect(answers.children[1].props).toMatchObject({ flexDirection: 'row', flexGrow: 1 })
