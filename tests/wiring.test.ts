@@ -391,6 +391,9 @@ test('🔤 shows one verb at a time in tabs, and an open panel stands apart from
   expect(tabs.props.flexDirection).toBe('column')
   expect(tabs.props.width).toBe('sacar'.length + 4) // fixed by the longest verb, whichever is chosen
   expect(tabs.children.map((c: any) => c.props.key)).toEqual(['verb-0', 'verb-1'])
+  // every tab padded alike (none dimmed), and on Desktop the panel's icon column gives the padding's cell back
+  expect(tabs.children.every((c: any) => !c.props.dimColor)).toBe(true)
+  expect(root.children[q + 2].children[0].props.width).toBe(3)
   expect(table.children.length).toBe(6) // the tenses, then one row per person
 
   // the panel counts as its 6 rows when the band is short: header, question, panel, answers

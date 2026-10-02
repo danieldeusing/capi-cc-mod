@@ -274,7 +274,8 @@ function view(Box, Text, Button, act) {
     : x.tables
       ? tables(Box, Text, Button, x.tables(card), verbTab?.id === id ? verbTab.index : 0, (i) => act.verb(id, i))
       : x.lines(card, stage, current.quizOk).map((l) => text(l, { italic: true, dimColor: true }))
-  if (extra.length) extra[0] = { ...extra[0], icon: x.icon } // the panel's icon, once, in the icon column
+  // the panel's icon, once, in the icon column; the verb tabs are buttons and pad themselves
+  if (extra.length) extra[0] = { ...extra[0], icon: x.icon, buttons: Boolean(x.tables) }
   // An open panel stands apart from the card with a blank line on either side.
   const panel = extra.length ? [gap, ...extra, gap] : []
   const next = Button({ key: 'next', label: 'próxima', hotkey: '1', plain: true, onPress: () => act.next(id) })
@@ -319,6 +320,8 @@ function tables(Box, Text, Button, list, selected, choose) {
   if (!list.length) return []
   const index = Math.min(Math.max(selected, 0), list.length - 1)
   const t = list[index]
+  // Every tab drawn alike (a dimmed Desktop button loses its padding, and the
+  // tabs would no longer start in one column); ▸ marks the chosen verb.
   // As wide as the longest verb with its ▸ and the button's frame, so the
   // table does not move when another verb is chosen.
   const tabs = Box({
@@ -326,7 +329,7 @@ function tables(Box, Text, Button, list, selected, choose) {
     width: Math.max(...list.map((v) => v.verb.length)) + 4,
     flexShrink: 0,
     children: list.map((v, i) =>
-      Button({ key: 'verb-' + i, label: (i === index ? '▸ ' : '') + v.verb, plain: true, dimColor: i !== index, onPress: () => choose(i) }),
+      Button({ key: 'verb-' + i, label: (i === index ? '▸ ' : '') + v.verb, plain: true, onPress: () => choose(i) }),
     ),
   })
   const table = Box({
@@ -349,8 +352,8 @@ function tables(Box, Text, Button, list, selected, choose) {
 // 👉 the answers. Parts marked flush draw the column themselves or are blank.
 const ICON_W = 2 + GAP
 function indent(Box, Text, p, surface) {
-  // A Desktop button draws its own padding, about a cell, before its hotkey;
-  // a row that starts with buttons takes that cell from the icon column.
+  // A Desktop button (one not dimmed) draws its own padding, about a cell; a
+  // row that starts with buttons takes that cell from the icon column.
   const width = ICON_W - (p.buttons && surface !== 'terminal' ? 1 : 0)
   const column = Box({ width, flexShrink: 0, children: p.icon ? [Text({ children: [p.icon] })] : [] })
   const shift = (n) => Box({ flexDirection: 'row', alignItems: 'flex-start', children: [column, Box({ flexDirection: 'row', flexGrow: 1, flexShrink: 1, children: [n] })] })
