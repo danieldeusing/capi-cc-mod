@@ -383,6 +383,7 @@ test('🔤 shows one verb at a time in tabs, and an open panel stands apart from
   expect(root.children[q + 1].children?.[0]).toBe(' ')
   // the verbs as tabs down the left, the table beside them
   expect(words(root.children[q + 2].children[0])).toEqual(['🔤']) // the panel's icon in the icon column
+  expect(root.children[q + 2].props.alignItems).toBe('flex-start') // at the panel's top, not its middle
   const [tabs, table] = root.children[q + 2].children[1].children[0].children
   expect(tabs.props.flexDirection).toBe('column')
   expect(tabs.props.width).toBe('sacar'.length + 4) // fixed by the longest verb, whichever is chosen

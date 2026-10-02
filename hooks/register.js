@@ -228,7 +228,7 @@ function view(Box, Text, Button, act) {
     flush: true,
     text: '❓ ' + card.question,
     drop: 0,
-    make: (cut) => Box({ flexDirection: 'row', children: [icon('❓'), Text({ bold: true, wrap: cut ? 'truncate-end' : 'wrap', children: [card.question] })] }),
+    make: (cut) => Box({ flexDirection: 'row', alignItems: 'flex-start', children: [icon('❓'), Text({ bold: true, wrap: cut ? 'truncate-end' : 'wrap', children: [card.question] })] }),
   }
   const id = card.id
   // Answers on the left; 🔊 and 🚩 on the right, in line with them.
@@ -349,7 +349,7 @@ function tables(Box, Text, Button, list, selected, choose) {
 const ICON_W = 2 + GAP
 function indent(Box, Text, p) {
   const column = Box({ width: ICON_W, flexShrink: 0, children: p.icon ? [Text({ children: [p.icon] })] : [] })
-  const shift = (n) => Box({ flexDirection: 'row', children: [column, Box({ flexDirection: 'row', flexGrow: 1, flexShrink: 1, children: [n] })] })
+  const shift = (n) => Box({ flexDirection: 'row', alignItems: 'flex-start', children: [column, Box({ flexDirection: 'row', flexGrow: 1, flexShrink: 1, children: [n] })] })
   return p.node ? { ...p, node: shift(p.node) } : { ...p, make: (cut) => shift(p.make(cut)) }
 }
 
