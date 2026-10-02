@@ -74,6 +74,7 @@ export function conjugationTables(card, cfg = DEFAULT_CONFIG) {
   return (card.verbs ?? [])
     .filter((v) => fitsTable(v, cfg))
     .map((v) => ({
+      verb: v.infinitive,
       title: `🔤 ${v.infinitive}${isText(v.de) ? ` = ${v.de}` : ''}${isText(v.inSentence) ? ` · im Satz: ${v.inSentence}${isText(v.form) ? ` (${v.form})` : ''}` : ''}`,
       header: ['', ...cfg.tenses],
       rows: cfg.persons.map((p, i) => [p, ...cfg.tenses.map((t) => v.tenses[t][i])]),

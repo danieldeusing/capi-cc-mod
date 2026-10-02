@@ -334,3 +334,29 @@ test('without a settings file Capi keeps its defaults', async ($, on) => {
   expect(model[0].system).toMatch(/teaches Brazilian Portuguese/)
   expect(model[0].system).toMatch(/native German speaker/)
 })
+
+test('🔤 shows one verb at a time in tabs, and an open panel stands apart from the question', async ($, on) => {
+  const forms = (a: string) => [a + '1', a + '2', a + '3', a + '4', a + '5']
+  const verb = (inf: string, p: string) => ({ infinitive: inf, de: inf, tenses: { presente: forms(p + 'P'), 'pretérito perfeito': forms(p + 'R'), 'pretérito imperfeito': forms(p + 'I'), futuro: forms(p + 'F'), 'subjuntivo presente': forms(p + 'S') } })
+  const text = (o: unknown) => ({ ...reply([]), text: JSON.stringify(o) })
+  const { model, clock } = engine(on, [reply(five()), text({ verbs: [verb('sacar', 'sa'), verb('ser', 'se')] })])
+  await start($, clock)
+  const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
+  await ui.press({ key: 'conj' })
+
+  expect(await ui.find({ key: 'verb-0' })).toMatchObject({ props: { label: '▸ sacar' } })
+  expect(await ui.find({ key: 'verb-1' })).toMatchObject({ props: { label: 'ser' } })
+  expect(await ui.find({ type: 'Text', text: 'saP1' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: 'seP1' })).toBeUndefined()
+
+  await ui.press({ key: 'verb-1' })
+  expect(await ui.find({ type: 'Text', text: 'seS5' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: 'saP1' })).toBeUndefined()
+  expect(model.length).toBe(2) // switching tabs asks for nothing
+
+  // the question, a blank line, then the panel
+  const root = (await ui.find({ type: 'Box' })) as any
+  const q = root.children.findIndex((c: any) => c.type === 'Text' && /ficam de fora/.test(c.children?.[0] ?? ''))
+  expect(root.children[q + 1].children?.[0]).toBe(' ')
+  expect(root.children[q + 2].children.map((c: any) => c.props.key)).toEqual(['verb-0', 'verb-1'])
+})

@@ -82,6 +82,8 @@ let syncTimer = null
 let armed = null
 // The one extra panel open in this session ({ id, kind }), and the one being fetched.
 let open = null
+// The verb tab chosen in the conjugation panel ({ id, index }); the first by default.
+let verbTab = null
 let loading = null
 let syncReport = 'not synced yet'
 let lastBatch = 'none yet'
@@ -142,6 +144,10 @@ export function register(on) {
       speak: () => speak($),
       flag: (id) => flag($, id),
       extra: (id, kind) => toggleExtra($, id, kind),
+      verb: (id, index) => {
+        verbTab = { id, index }
+        $.ui.invalidate('ui.render')
+      },
     })
     return Box({ flexDirection: 'column', children: fit(parts, e.props.maxRows ?? 99, e.props.bodyColumns ?? 80) })
   })
@@ -224,9 +230,9 @@ function view(Box, Text, Button, act) {
         ],
       }),
     )
-  // A blank line under the header and above the buttons; both go first when
-  // the band is short.
-  const gap = { text: '', drop: 1, make: () => Text({ children: [' '] }) }
+  // A blank line between the blocks of the card. Always kept: when the band is
+  // short the note goes and texts are cut instead.
+  const gap = { text: '', drop: 0, make: () => Text({ children: [' '] }) }
   const flagLabel = current.flagged ? '🚩 marcado' : armed?.id === id ? '🚩 de novo = confirmar' : '🚩 tá errado?'
   const tools = [
     Button({ key: 'speak', label: '🔊 ouvir', hotkey: '8', plain: true, onPress: act.speak }),
@@ -249,18 +255,25 @@ function view(Box, Text, Button, act) {
       }),
   }
   // Asked for, so never dropped to save rows; cut to one line at worst.
-  const extra = open?.id !== id ? [] : EXTRAS[open.kind].tables ? tables(Box, Text, EXTRAS[open.kind].tables(card)) : EXTRAS[open.kind].lines(card, stage, current.quizOk).map((l) => text(l, { italic: true, dimColor: true }))
+  const x = open?.id === id ? EXTRAS[open.kind] : null
+  const extra = !x
+    ? []
+    : x.tables
+      ? tables(Box, Text, Button, x.tables(card), verbTab?.id === id ? verbTab.index : 0, (i) => act.verb(id, i))
+      : x.lines(card, stage, current.quizOk).map((l) => text(l, { italic: true, dimColor: true }))
+  // An open panel stands apart from the card with a blank line on either side.
+  const panel = extra.length ? [gap, ...extra, gap] : []
   const next = Button({ key: 'next', label: 'próxima', hotkey: '1', plain: true, onPress: () => act.next(id) })
   const note = text('📚 ' + card.note, { dimColor: true }, 1)
 
   if (card.format === 'bonus') {
-    return [top, gap, text(ASK.bonus, { bold: true }), text(card.question), text(card.explain), ...extra, note, gap, row([next])]
+    return [top, gap, text(ASK.bonus, { bold: true }), text(card.question), text(card.explain), ...panel, note, gap, row([next])]
   }
   if (stage === 'quiz') {
     const options = card.options.map((o, i) =>
       Button({ key: 'opt-' + i, label: o, hotkey: String(i + 1), plain: true, onPress: () => act.pick(id, i) }),
     )
-    return [top, gap, text('❓ ' + ASK[card.format], { bold: true }), text(card.question), ...extra, gap, row(options)]
+    return [top, gap, text('❓ ' + ASK[card.format], { bold: true }), text(card.question), ...(extra.length ? [gap, ...extra] : []), gap, row(options)]
   }
   const verdict = current.quizOk
     ? `✅ Certo! +${current.gain} · ${card.capiRight}`
@@ -277,36 +290,51 @@ function view(Box, Text, Button, act) {
     gap,
     text(verdict, { color: current.quizOk ? 'green' : 'red' }),
     text(`${card.explain} (Fonte: ${card.source})`),
-    ...extra,
+    ...panel,
     note,
     gap,
     row(ask),
   ]
 }
 
-// Conjugation tables as the morning briefs draw them: a title, then a header of
-// tenses over one row per person. Boxes of fixed width keep the columns aligned
-// in the Desktop app's proportional font too.
-function tables(Box, Text, list) {
+// Conjugation as the morning briefs draw it, one verb at a time: a tab per verb,
+// then the chosen verb's title and its table, a header of tenses over one row
+// per person. Boxes of fixed width keep the columns aligned in the Desktop
+// app's proportional font too.
+function tables(Box, Text, Button, list, selected, choose) {
+  if (!list.length) return []
+  const index = Math.min(Math.max(selected, 0), list.length - 1)
+  const t = list[index]
   const parts = []
-  for (const t of list) {
-    parts.push({ text: t.title, drop: 0, make: (cut) => Text({ bold: true, wrap: cut ? 'truncate-end' : 'wrap', children: [t.title] }) })
-    for (const [i, cells] of [t.header, ...t.rows].entries()) {
-      parts.push({
-        node: Box({
-          flexDirection: 'row',
-          children: cells.map((c, j) =>
-            Box({ width: j === 0 ? 10 : 22, children: [Text({ dimColor: i === 0 || j === 0, italic: i === 0, wrap: 'truncate-end', children: [c] })] }),
-          ),
-        }),
-      })
-    }
+  if (list.length > 1) {
+    parts.push({
+      node: Box({
+        flexDirection: 'row',
+        columnGap: 3,
+        children: list.map((v, i) =>
+          Button({ key: 'verb-' + i, label: (i === index ? '▸ ' : '') + v.verb, plain: true, dimColor: i !== index, onPress: () => choose(i) }),
+        ),
+      }),
+    })
+    parts.push({ text: '', drop: 0, make: () => Text({ children: [' '] }) })
+  }
+  parts.push({ text: t.title, drop: 0, make: (cut) => Text({ bold: true, wrap: cut ? 'truncate-end' : 'wrap', children: [t.title] }) })
+  for (const [i, cells] of [t.header, ...t.rows].entries()) {
+    parts.push({
+      node: Box({
+        flexDirection: 'row',
+        children: cells.map((c, j) =>
+          Box({ width: j === 0 ? 10 : 22, children: [Text({ dimColor: i === 0 || j === 0, italic: i === 0, wrap: 'truncate-end', children: [c] })] }),
+        ),
+      }),
+    })
   }
   return parts
 }
 
 // A tree taller than the band scrolls, and then the digit hotkeys stop working.
-// So: drop the note, then the header, then cut every text to one line.
+// So: drop the note, then cut every text to one line. Blank lines, the header
+// and an open panel stay.
 function fit(parts, maxRows, cols) {
   const rows = (p, cut) => (p.make && !cut ? Math.max(1, Math.ceil(p.text.length / Math.max(cols, 20))) : 1)
   const height = (list, cut) => list.reduce((n, p) => n + rows(p, cut), 0)
