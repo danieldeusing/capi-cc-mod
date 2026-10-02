@@ -12,6 +12,8 @@ import { buildRequest, parseCards, activityHint, germanLines, headerParts, trans
 import { grammarRequest, parseGrammar, grammarLines, conjugationRequest, parseConjugation, conjugationTables, fitsTable } from './lib/extras.js'
 import { configFrom, parseEnv, DEFAULT_CONFIG } from './lib/config.js'
 
+// The one horizontal space between things side by side: pairs, buttons, tabs.
+const GAP = 2
 // The facts have to be TRUE, so batches go to Opus at high effort. They run in
 // the background while cards are still queued, so the latency costs nothing.
 const GENERATE = { model: 'claude-opus-5-5', effort: 'high', maxTokens: 32000, timeoutMs: 300_000 }
@@ -190,7 +192,7 @@ function view(Box, Text, Button, act) {
   const pairs = (list, dim) =>
     Box({
       flexDirection: 'row',
-      columnGap: 4,
+      columnGap: GAP,
       children: list.map(([k, v]) =>
         Box({ flexDirection: 'row', columnGap: 1, children: [Text({ dimColor: true, children: [k] }), Text({ dimColor: dim, wrap: 'truncate-end', children: [v] })] }),
       ),
@@ -233,8 +235,8 @@ function view(Box, Text, Button, act) {
         flexDirection: 'row',
         justifyContent: 'space-between',
         children: [
-          Box({ flexDirection: 'row', columnGap: 3, children }),
-          Box({ flexDirection: 'row', columnGap: 3, children: tools }),
+          Box({ flexDirection: 'row', columnGap: GAP, children }),
+          Box({ flexDirection: 'row', columnGap: GAP, children: tools }),
         ],
       }),
     )
@@ -255,7 +257,7 @@ function view(Box, Text, Button, act) {
   const top = {
     text: head.text,
     drop: 0,
-    make: (cut) => head.make(cut, Box({ flexDirection: 'row', columnGap: 3, children: extraButtons })),
+    make: (cut) => head.make(cut, Box({ flexDirection: 'row', columnGap: GAP, children: extraButtons })),
   }
   // Asked for, so never dropped to save rows; cut to one line at worst.
   const x = open?.id === id ? EXTRAS[open.kind] : null
@@ -301,8 +303,8 @@ function view(Box, Text, Button, act) {
 }
 
 // Conjugation as the morning briefs draw it, one verb at a time: a tab per verb,
-// then the chosen verb's title and its table, a header of tenses over one row
-// per person. Boxes of fixed width keep the columns aligned in the Desktop
+// then the chosen verb's table: the verb and its tenses over one row per
+// person. Boxes of fixed width keep the columns aligned in the Desktop
 // app's proportional font too.
 function tables(Box, Text, Button, list, selected, choose) {
   if (!list.length) return []
@@ -313,7 +315,7 @@ function tables(Box, Text, Button, list, selected, choose) {
     parts.push({
       node: Box({
         flexDirection: 'row',
-        columnGap: 3,
+        columnGap: GAP,
         children: list.map((v, i) =>
           Button({ key: 'verb-' + i, label: (i === index ? '▸ ' : '') + v.verb, plain: true, dimColor: i !== index, onPress: () => choose(i) }),
         ),
@@ -321,13 +323,12 @@ function tables(Box, Text, Button, list, selected, choose) {
     })
     parts.push({ text: '', drop: 0, make: () => Text({ children: [' '] }) })
   }
-  parts.push({ text: t.title, drop: 0, make: (cut) => Text({ bold: true, wrap: cut ? 'truncate-end' : 'wrap', children: [t.title] }) })
   for (const [i, cells] of [t.header, ...t.rows].entries()) {
     parts.push({
       node: Box({
         flexDirection: 'row',
         children: cells.map((c, j) =>
-          Box({ width: j === 0 ? 10 : 22, children: [Text({ dimColor: i === 0 || j === 0, italic: i === 0, wrap: 'truncate-end', children: [c] })] }),
+          Box({ width: j === 0 ? 12 : 22, children: [Text({ bold: i === 0 && j === 0, dimColor: (i === 0) !== (j === 0), italic: i === 0 && j > 0, wrap: 'truncate-end', children: [c] })] }),
         ),
       }),
     })

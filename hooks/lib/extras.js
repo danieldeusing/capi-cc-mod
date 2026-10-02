@@ -16,7 +16,7 @@ export function conjugationSystem(cfg = DEFAULT_CONFIG) {
   const persons = cfg.persons.join(', ')
   const tenses = Object.fromEntries(cfg.tenses.map((t) => [t, cfg.persons.map(() => '…')]))
   return `You conjugate the verbs of one ${cfg.learn} sentence for a ${cfg.native}-speaking learner. Reply with ONLY a JSON object:
-{"verbs":[{"infinitive":"...","de":"${cfg.native} meaning","inSentence":"the form used in the sentence","form":"its tense and person, in ${cfg.learn}","tenses":${JSON.stringify(tenses)}}]}
+{"verbs":[{"infinitive":"...","tenses":${JSON.stringify(tenses)}}]}
 Every verb in the sentence, auxiliaries included, at most 4, in the order they appear. Each tense lists exactly ${cfg.persons.length} forms, one per person, in this order: ${persons}. Use the forms these persons take in everyday ${cfg.learn}. ${NO_GIVEAWAY}`
 }
 
@@ -68,15 +68,14 @@ export function grammarLines(card) {
   return (card.grammarDe ?? []).map((n) => '📐 ' + n)
 }
 
-// One table per verb, the way the morning briefs draw it: a title line, then a
-// header row of tenses and one row per person.
+// One table per verb, the way the morning briefs draw it: the verb over the
+// persons and the tenses across, one row per person.
 export function conjugationTables(card, cfg = DEFAULT_CONFIG) {
   return (card.verbs ?? [])
     .filter((v) => fitsTable(v, cfg))
     .map((v) => ({
       verb: v.infinitive,
-      title: `🔤 ${v.infinitive}${isText(v.de) ? ` = ${v.de}` : ''}${isText(v.inSentence) ? ` · im Satz: ${v.inSentence}${isText(v.form) ? ` (${v.form})` : ''}` : ''}`,
-      header: ['', ...cfg.tenses],
+      header: [v.infinitive, ...cfg.tenses],
       rows: cfg.persons.map((p, i) => [p, ...cfg.tenses.map((t) => v.tenses[t][i])]),
     }))
 }

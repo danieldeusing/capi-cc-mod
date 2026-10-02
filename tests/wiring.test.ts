@@ -295,7 +295,7 @@ test('📐 🔤 🇩🇪 sit top right, 🇩🇪 on key 0, 🔊 🚩 bottom righ
 test('📐 and 🔤 are generated once each, at their effort, and only one panel is open at a time', async ($, on) => {
   const grammar = { grammarDe: ['«do caju» = de + o, wie ein Genitiv: der Teil DES Cashews.', '«saca só» ist Umgangssprache.'] }
   const forms = (a: string) => [a + '1', a + '2', a + '3', a + '4', a + '5']
-  const verbs = { verbs: [{ infinitive: 'ser', de: 'sein', inSentence: 'é', form: 'presente, ele', tenses: { presente: forms('sou'), 'pretérito perfeito': forms('fui'), 'pretérito imperfeito': forms('era'), futuro: forms('serei'), 'subjuntivo presente': forms('seja') } }] }
+  const verbs = { verbs: [{ infinitive: 'ser', tenses: { presente: forms('sou'), 'pretérito perfeito': forms('fui'), 'pretérito imperfeito': forms('era'), futuro: forms('serei'), 'subjuntivo presente': forms('seja') } }] }
   const text = (o: unknown) => ({ ...reply([]), text: JSON.stringify(o) })
   const { model, store, clock } = engine(on, [reply(five()), text(grammar), text(verbs)])
   await start($, clock)
@@ -307,8 +307,9 @@ test('📐 and 🔤 are generated once each, at their effort, and only one panel
 
   await ui.press({ key: 'conj' })
   expect(model[2]).toMatchObject({ effort: 'low' })
-  expect(await ui.find({ type: 'Text', text: /🔤 ser = sein · im Satz: é \(presente, ele\)/ })).toBeDefined()
-  // a table as in the morning briefs: tenses across, one row per person
+  // a table as in the morning briefs: the verb in its corner, tenses across, one row per person, no title line
+  expect(await ui.find({ type: 'Text', text: /^ser$/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /🔤 ser|=/ })).toBeUndefined()
   expect(await ui.find({ type: 'Text', text: 'subjuntivo presente' })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: 'ele/ela' })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: 'seja3' })).toBeDefined()
