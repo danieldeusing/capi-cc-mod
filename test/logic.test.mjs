@@ -211,7 +211,7 @@ test('grammar and conjugation replies are checked, tables follow the config, and
   const { verbs } = x.parseConjugation(reply, cfg)
   assert.deepEqual(verbs.map((v) => v.infinitive), ['ser']) // a tense one person short is dropped
   const [table] = x.conjugationTables({ verbs }, cfg)
-  assert.deepEqual(table.header, ['ser', 'presente', 'pretérito perfeito', 'pretérito imperfeito', 'futuro', 'subjuntivo presente'])
+  assert.deepEqual(table.header, ['', 'presente', 'pretérito perfeito', 'pretérito imperfeito', 'futuro', 'subjuntivo presente'])
   assert.deepEqual(table.rows.map((r) => r[0]), ['eu', 'você', 'ele/ela', 'nós', 'vocês']) // as the morning briefs: no tu, no vós
   assert.deepEqual(table.rows[1], ['você', 'p1', 'p1', 'p1', 'f1', 's1'])
   assert.deepEqual(table.widths, [7, 8, 18, 20, 6, 19]) // longest cell per column: ele/ela, then the tense names

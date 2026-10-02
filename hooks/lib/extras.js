@@ -68,13 +68,13 @@ export function grammarLines(card) {
   return (card.grammarDe ?? []).map((n) => '📐 ' + n)
 }
 
-// One table per verb, the way the morning briefs draw it: the verb over the
-// persons and the tenses across, one row per person.
+// One table per verb, the way the morning briefs draw it: the tenses across,
+// one row per person. The verb itself is its tab.
 export function conjugationTables(card, cfg = DEFAULT_CONFIG) {
   return (card.verbs ?? [])
     .filter((v) => fitsTable(v, cfg))
     .map((v) => {
-      const header = [v.infinitive, ...cfg.tenses]
+      const header = ['', ...cfg.tenses]
       const rows = cfg.persons.map((p, i) => [p, ...cfg.tenses.map((t) => v.tenses[t][i])])
       // each column as wide as its longest cell
       const widths = header.map((_, j) => Math.max(...[header, ...rows].map((r) => r[j].length)))

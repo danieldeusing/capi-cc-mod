@@ -258,7 +258,7 @@ function view(Box, Text, Button, Svg, act) {
   const extra = !x
     ? []
     : x.tables
-      ? tables(Box, Text, Button, gap, x.tables(card), verbTab?.id === id ? verbTab.index : 0, (i) => act.verb(id, i))
+      ? tables(Box, Text, Button, x.tables(card), verbTab?.id === id ? verbTab.index : 0, (i) => act.verb(id, i))
       : x.lines(card, stage, current.quizOk).map((l) => text(l, { italic: true, dimColor: true }))
   // An open panel stands apart from the card with a blank line on either side.
   const panel = extra.length ? [gap, ...extra, gap] : []
@@ -307,45 +307,39 @@ function spacer(Text, Svg) {
   return { text: '', drop: 0, make }
 }
 
-// Conjugation as the morning briefs draw it, one verb at a time: a tab per verb,
-// then the chosen verb's table: the verb and its tenses over one row per
-// person. Boxes of fixed width keep the columns aligned in the Desktop
+// Conjugation as the morning briefs draw it, one verb at a time: the verbs as
+// tabs down the left, the chosen verb's table beside them, the tenses over one
+// row per person. Boxes of fixed width keep the columns aligned in the Desktop
 // app's proportional font too.
-function tables(Box, Text, Button, gap, list, selected, choose) {
+function tables(Box, Text, Button, list, selected, choose) {
   if (!list.length) return []
   const index = Math.min(Math.max(selected, 0), list.length - 1)
   const t = list[index]
-  const parts = []
-  if (list.length > 1) {
-    parts.push({
-      node: Box({
-        flexDirection: 'row',
-        columnGap: GAP,
-        children: list.map((v, i) =>
-          Button({ key: 'verb-' + i, label: (i === index ? '▸ ' : '') + v.verb, plain: true, dimColor: i !== index, onPress: () => choose(i) }),
-        ),
-      }),
-    })
-    parts.push(gap)
-  }
-  for (const [i, cells] of [t.header, ...t.rows].entries()) {
-    parts.push({
-      node: Box({
+  const tabs = Box({
+    flexDirection: 'column',
+    children: list.map((v, i) =>
+      Button({ key: 'verb-' + i, label: (i === index ? '▸ ' : '') + v.verb, plain: true, dimColor: i !== index, onPress: () => choose(i) }),
+    ),
+  })
+  const table = Box({
+    flexDirection: 'column',
+    children: [t.header, ...t.rows].map((cells, i) =>
+      Box({
         flexDirection: 'row',
         children: cells.map((c, j) =>
-          Box({ width: t.widths[j] + GAP, children: [Text({ bold: i === 0 && j === 0, dimColor: (i === 0) !== (j === 0), italic: i === 0 && j > 0, wrap: 'truncate-end', children: [c] })] }),
+          Box({ width: t.widths[j] + GAP, children: [Text({ dimColor: (i === 0) !== (j === 0), italic: i === 0 && j > 0, wrap: 'truncate-end', children: [c] })] }),
         ),
       }),
-    })
-  }
-  return parts
+    ),
+  })
+  return [{ node: Box({ flexDirection: 'row', columnGap: GAP, children: [tabs, table] }), rows: Math.max(list.length, t.rows.length + 1) }]
 }
 
 // A tree taller than the band scrolls, and then the digit hotkeys stop working.
 // So: drop the note, then cut every text to one line. Blank lines, the header
 // and an open panel stay.
 function fit(parts, maxRows, cols) {
-  const rows = (p, cut) => (p.make && !cut ? Math.max(1, Math.ceil(p.text.length / Math.max(cols, 20))) : 1)
+  const rows = (p, cut) => p.rows ?? (p.make && !cut ? Math.max(1, Math.ceil(p.text.length / Math.max(cols, 20))) : 1)
   const height = (list, cut) => list.reduce((n, p) => n + rows(p, cut), 0)
   let keep = parts
   for (const level of [1, 2]) if (height(keep, false) > maxRows) keep = keep.filter((p) => p.drop !== level)

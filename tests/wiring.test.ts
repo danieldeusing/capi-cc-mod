@@ -314,8 +314,8 @@ test('📐 and 🔤 are generated once each, at their effort, and only one panel
 
   await ui.press({ key: 'conj' })
   expect(model[2]).toMatchObject({ effort: 'low' })
-  // a table as in the morning briefs: the verb in its corner, tenses across, one row per person, no title line
-  expect(await ui.find({ type: 'Text', text: /^ser$/ })).toBeDefined()
+  // a table as in the morning briefs: tenses across, one row per person, no title line; one verb is still a tab
+  expect(await ui.find({ key: 'verb-0' })).toMatchObject({ props: { label: '▸ ser' } })
   expect(await ui.find({ type: 'Text', text: /🔤 ser|=/ })).toBeUndefined()
   expect(await ui.find({ type: 'Text', text: 'subjuntivo presente' })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: 'ele/ela' })).toBeDefined()
@@ -370,5 +370,19 @@ test('🔤 shows one verb at a time in tabs, and an open panel stands apart from
   const root = (await ui.find({ type: 'Box' })) as any
   const q = root.children.findIndex((c: any) => c.type === 'Text' && /ficam de fora/.test(c.children?.[0] ?? ''))
   expect(root.children[q + 1]).toMatchObject({ type: 'Svg', props: { height: 9 } }) // Desktop: half a row
-  expect(root.children[q + 2].children.map((c: any) => c.props.key)).toEqual(['verb-0', 'verb-1'])
+  // the verbs as tabs down the left, the table beside them
+  const [tabs, table] = root.children[q + 2].children
+  expect(tabs.props.flexDirection).toBe('column')
+  expect(tabs.children.map((c: any) => c.props.key)).toEqual(['verb-0', 'verb-1'])
+  expect(table.children.length).toBe(6) // the tenses, then one row per person
+
+  // the panel counts as its 6 rows when the band is short: header, question, panel, answers
+  // and 3 spaces are 12 rows, so 11 cuts texts to one line and 12 does not
+  const question = async (maxRows: number) => {
+    const band = await $.ui.mount({ ...BAND, props: { ...BAND.props, maxRows }, surface: 'desktop' })
+    const r = (await band.find({ type: 'Box' })) as any
+    return r.children.find((c: any) => c.type === 'Text' && /ficam de fora/.test(c.children?.[0] ?? '')).props.wrap
+  }
+  expect(await question(11)).toBe('truncate-end')
+  expect(await question(12)).toBe('wrap')
 })
