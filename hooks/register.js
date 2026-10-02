@@ -134,8 +134,9 @@ export function register(on) {
     // Always there, working or not: a card waits until it is answered, and only
     // answering pulls new cards, so a visible band never costs a model call.
     if (e.props.hasSurvey) return next(e)
-    const { Box, Text, Button } = $.ui.resolve(e)
-    const parts = view(Box, Text, Button, (e.props.bodyColumns ?? 80) - ICON_W, {
+    const { Box, Text, Button, Svg } = $.ui.resolve(e)
+    // a remote surface draws the fold chevron; the terminal has no drawings and shows text
+    const parts = view(Box, Text, Button, e.surface === 'terminal' ? null : Svg, (e.props.bodyColumns ?? 80) - ICON_W, {
       pick: (id, i) => pick($, id, i),
       grade: (id, ok) => grade($, id, ok),
       next: (id) => nextCard($, id),
@@ -188,7 +189,7 @@ async function machineName($) {
 
 // Parts of the card: { make(cut) } for text that may be cut to one line,
 // { node } otherwise. `drop` marks what goes first when the band is short.
-function view(Box, Text, Button, cols, act) {
+function view(Box, Text, Button, Svg, cols, act) {
   const s = state
   const text = (t, props = {}, drop = 0) => ({
     text: t,
@@ -230,8 +231,16 @@ function view(Box, Text, Button, cols, act) {
       }),
   }
   // The fold toggle is a grey chevron alone, like the app's own chips: no emoji, no hotkey, no word.
-  // ⌃ sits small and high; ˅ (a raised modifier mark) is the down arrow drawn at that size and place.
-  const size = Button({ key: 'size', label: minimized ? '⌃' : '˅', plain: true, dimColor: true, onPress: act.size })
+  // No font has a down arrow that mirrors ⌃, and a label cannot be rotated, so a remote surface
+  // draws one chevron, flipped for down, under a blank button: the button is drawn after the
+  // drawing, so it sits on top and takes the click. The terminal shows ⌃ and ˅.
+  const toggle = Button({ key: 'size', label: Svg ? '  ' : minimized ? '⌃' : '˅', plain: true, dimColor: true, onPress: act.size })
+  const size = Svg
+    ? Box({
+        flexDirection: 'row',
+        children: [Box({ position: 'absolute', top: 0, left: 0, children: [chevron(Svg, minimized)] }), toggle],
+      })
+    : toggle
   // The header line: the pairs, and the fold toggle alone at its right end.
   const top = { ...head, make: (cut) => head.make(cut, size) }
   // Folded, or with no card yet: the header line with 🔼/🔽 alone at its right.
@@ -372,6 +381,14 @@ function tables(Box, Text, Button, list, selected, choose) {
     ),
   })
   return [{ node: Box({ flexDirection: 'row', columnGap: GAP, children: [tabs, table] }), rows: Math.max(list.length, t.rows.length + 1) }]
+}
+
+// The fold chevron as a drawing: one path, mirrored top to bottom for down, in a
+// mid grey that reads as dimmed on both the dark and the light theme.
+function chevron(Svg, up) {
+  const d = up ? 'M3 10 L7 6 L11 10' : 'M3 6 L7 10 L11 6'
+  const source = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 14 16"><path d="${d}" fill="none" stroke="#8e8e8e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+  return Svg({ source, alt: up ? 'abrir' : 'recolher', width: 14, height: 16 })
 }
 
 // The cells a row of elements takes: Text by its words, a Button by its label

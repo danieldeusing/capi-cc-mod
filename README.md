@@ -19,8 +19,8 @@ you know come back later, and your history syncs between your Macs through iClou
 | `8` | 🔊 hear it (macOS voice *Luciana*) |
 | `9`, then `9` again | 🚩 the fact is wrong: it is never used again, and Capi re-checks it |
 
-Click ˅ at the right end of the header to fold the band to that one line, and
-⌃ to open it again. The band remembers, also in new sessions.
+Click the grey chevron at the right end of the header to fold the band to that
+one line, and again to open it. The band remembers, also in new sessions.
 
 `/ptbr` shows level, streak, points, what is due, and how the last sync and card
 generation went. It answers instantly, also while Claude works. `/ptbr skip` drops

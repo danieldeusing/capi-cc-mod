@@ -82,6 +82,10 @@ function engine(on: any, replies: unknown[], files = new Map<string, string>(), 
 // every string under a node, in drawing order
 const words = (box: any): string[] => (box.children ?? []).flatMap((c: any) => (typeof c === 'string' ? [c] : words(c)))
 
+// every element key under a node, in drawing order
+const keysIn = (box: any): string[] =>
+  (box?.children ?? []).flatMap((c: any) => (typeof c === 'string' ? [] : [...(c.props?.key ? [c.props.key] : []), ...keysIn(c)]))
+
 // the first Text under a node whose words match
 const textOf = (box: any, re: RegExp): any =>
   box?.type === 'Text' && re.test(words(box).join(' ')) ? box : (box?.children ?? []).map((c: any) => (typeof c === 'string' ? undefined : textOf(c, re))).find(Boolean)
@@ -218,15 +222,19 @@ test('˅ folds the band to its header line, ⌃ opens it again, and a new sessio
   await start($, clock)
   const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
   const toggle = (await ui.find({ key: 'size' })) as any
-  expect(toggle.props.label).toBe('˅') // a chevron alone, grey like the app's own chips
-  expect(toggle.props.dimColor).toBe(true)
+  expect(toggle.props.label.trim()).toBe('') // Desktop draws the chevron under a blank button
   expect(toggle.props.hotkey).toBeUndefined()
+  const drawing = async () => ((await ui.find({ type: 'Svg' })) as any).props.source as string
+  const down = await drawing()
   await ui.press({ key: 'size' })
   const folded = (await ui.find({ type: 'Box' })) as any
   expect(folded.children.length).toBe(1) // the header line alone
   expect(await ui.find({ key: 'opt-0' })).toBeUndefined()
   expect(await ui.find({ key: 'gram' })).toBeUndefined()
-  expect(await ui.find({ key: 'size' })).toMatchObject({ props: { label: '⌃' } })
+  // the same path, mirrored top to bottom
+  const up = await drawing()
+  const path = (src: string) => /d="M3 (\d+) L7 (\d+) L11 (\d+)"/.exec(src)!.slice(1).map(Number)
+  expect(path(up)).toEqual(path(down).map((y) => 16 - y))
   expect(store.get('minimized')).toBe(true)
   await ui.press({ key: 'size' })
   expect(await ui.find({ key: 'opt-0' })).toBeDefined()
@@ -264,7 +272,7 @@ test('a band folded in another session opens folded', async ($, on) => {
   await start($, clock)
   const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
   expect(await ui.find({ key: 'opt-0' })).toBeUndefined()
-  expect(await ui.find({ key: 'size' })).toMatchObject({ props: { label: '⌃' } })
+  expect(await ui.find({ key: 'size' })).toMatchObject({ props: { label: '⌃', dimColor: true } }) // the terminal shows text
 })
 
 test('a card that arrives after the turn ended shows while idle', async ($, on) => {
@@ -352,7 +360,7 @@ test('📐 🔤 🇩🇪 sit top right, 🇩🇪 on key 0, 🔊 🚩 bottom righ
     // header: ONE line, the card's pairs then the learner's, with 📐 🔤 🇩🇪 at its right
     const header = root0.children[0]
     expect(header.props.justifyContent).toBe('space-between')
-    expect(header.children[1].children.map((c: any) => c.props.key)).toEqual(['size']) // the fold toggle alone at the header's right
+    expect(keysIn(header.children[1])).toEqual(['size']) // the fold toggle alone at the header's right
     expect(words(header.children[0])).toEqual(['🦫', 'categoria', 'brasil', 'tipo', 'Fala', 'pergunta', 'Verdade ou mentira', 'nível', 'Turista 0/50', 'sequência', '0 dias', 'combo', '0'])
     expect(words(root0.children[0]).join(' ')).not.toMatch(/[·│|]/) // one structure: no separators
     // labels dim, every value and the question at full strength, the question bold
