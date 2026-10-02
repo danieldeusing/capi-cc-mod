@@ -282,6 +282,9 @@ test('📐 🔤 🇩🇪 sit top right, 🇩🇪 on key 0, 🔊 🚩 bottom righ
     const answers = root0.children[root0.children.length - 1]
     expect(words(answers.children[0])).toEqual(['👉'])
     const bar = answers.children[1].children[0]
+    // 🔊 🚩 at the right edge: the text column fills the row and the bar fills the text column
+    expect(answers.children[1].props).toMatchObject({ flexDirection: 'row', flexGrow: 1 })
+    expect(bar.props.flexGrow).toBe(1)
     expect(bar.props.justifyContent).toBe('space-between')
     expect(bar.children[0].children.map((c: any) => c.props.key)).toEqual(['opt-0', 'opt-1'])
     expect(bar.children[1].children.map((c: any) => c.props.key)).toEqual(['speak', 'flag'])

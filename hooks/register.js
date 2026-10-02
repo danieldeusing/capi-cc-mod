@@ -238,6 +238,7 @@ function view(Box, Text, Button, act) {
       Box({
         flexDirection: 'row',
         justifyContent: 'space-between',
+        flexGrow: 1, // the whole width after the icon column, so 🔊 🚩 reach the right edge
         children: [
           Box({ flexDirection: 'row', columnGap: GAP, children }),
           Box({ flexDirection: 'row', columnGap: GAP, children: tools }),
@@ -348,7 +349,7 @@ function tables(Box, Text, Button, list, selected, choose) {
 const ICON_W = 2 + GAP
 function indent(Box, Text, p) {
   const column = Box({ width: ICON_W, flexShrink: 0, children: p.icon ? [Text({ children: [p.icon] })] : [] })
-  const shift = (n) => Box({ flexDirection: 'row', children: [column, Box({ flexDirection: 'column', flexGrow: 1, flexShrink: 1, children: [n] })] })
+  const shift = (n) => Box({ flexDirection: 'row', children: [column, Box({ flexDirection: 'row', flexGrow: 1, flexShrink: 1, children: [n] })] })
   return p.node ? { ...p, node: shift(p.node) } : { ...p, make: (cut) => shift(p.make(cut)) }
 }
 
