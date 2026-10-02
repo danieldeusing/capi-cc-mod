@@ -7,6 +7,8 @@ expression in the language you learn (Brazilian Portuguese unless you
 [configure](#configure) another), with explanations in your own language. Answer with the
 digit keys (type the digit into the empty prompt) or by clicking.
 
+![A 38-second tour: a card above the prompt, its translation, grammar notes and conjugation tables, then a right and a wrong answer](video/capi.gif)
+
 Capi remembers what you know. Expressions you miss come back sooner, expressions
 you know come back later, and your history syncs between your Macs through iCloud.
 
@@ -173,6 +175,9 @@ node --test test/*.test.mjs       # the learning logic, no Claude Code needed
 claude plugin test                # the wiring, in Claude Code's own test kit
 claude plugin validate . --strict # what Claude Code reads from the mod
 ```
+
+`video/` is the Remotion source of the tour above: `npm install`, then
+`npm run render && npm run gif` in that folder.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.
 

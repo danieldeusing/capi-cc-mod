@@ -1,0 +1,153 @@
+[
+  {
+    "question": "Saca só: a parte suculenta do caju é o fruto de verdade, e a castanha é só a semente.",
+    "options": [
+      "verdade",
+      "mentira"
+    ],
+    "answer": 1,
+    "explain": "Mentira! A parte carnuda do caju é um pseudofruto, o pedúnculo inchado. O fruto de verdade é a castanha-de-caju, que fica pendurada embaixo.",
+    "source": "Embrapa",
+    "capiRight": "Sacou tudo! O caju não te engana.",
+    "questionDe": "Schau mal: Der saftige Teil der Cashewfrucht ist die echte Frucht, und die Nuss ist nur der Samen.",
+    "grammarDe": [
+      "«Saca só»: umgangssprachlicher Imperativ, Form wie «ele saca». «só» verstärkt hier nur, ähnlich wie dt. „mal“.",
+      "«do caju» = de + o: ersetzt den Genitiv, wie „der Teil der Cashewfrucht“. Artikel + Präposition verschmelzen immer.",
+      "«a parte suculenta»: Das Adjektiv steht nach dem Nomen, im Deutschen davor („der saftige Teil“).",
+      "«é» von ser, nicht estar: Es geht um das Wesen bzw. eine Definition, nicht um einen Zustand.",
+      "«de verdade» steht nach dem Nomen wie ein Adjektiv („echt“). «é só a semente»: Hier bedeutet «só» „nur“."
+    ],
+    "verbs": [
+      {
+        "infinitive": "sacar",
+        "de": "kapieren, checken (umgangssprachlich)",
+        "inSentence": "Saca",
+        "form": "imperativo afirmativo, você (informal)",
+        "tenses": {
+          "presente": [
+            "saco",
+            "saca",
+            "saca",
+            "sacamos",
+            "sacam"
+          ],
+          "pretérito perfeito": [
+            "saquei",
+            "sacou",
+            "sacou",
+            "sacamos",
+            "sacaram"
+          ],
+          "pretérito imperfeito": [
+            "sacava",
+            "sacava",
+            "sacava",
+            "sacávamos",
+            "sacavam"
+          ],
+          "futuro": [
+            "sacarei",
+            "sacará",
+            "sacará",
+            "sacaremos",
+            "sacarão"
+          ],
+          "subjuntivo presente": [
+            "saque",
+            "saque",
+            "saque",
+            "saquemos",
+            "saquem"
+          ]
+        }
+      },
+      {
+        "infinitive": "ser",
+        "de": "sein",
+        "inSentence": "é",
+        "form": "presente do indicativo, ele/ela",
+        "tenses": {
+          "presente": [
+            "sou",
+            "é",
+            "é",
+            "somos",
+            "são"
+          ],
+          "pretérito perfeito": [
+            "fui",
+            "foi",
+            "foi",
+            "fomos",
+            "foram"
+          ],
+          "pretérito imperfeito": [
+            "era",
+            "era",
+            "era",
+            "éramos",
+            "eram"
+          ],
+          "futuro": [
+            "serei",
+            "será",
+            "será",
+            "seremos",
+            "serão"
+          ],
+          "subjuntivo presente": [
+            "seja",
+            "seja",
+            "seja",
+            "sejamos",
+            "sejam"
+          ]
+        }
+      }
+    ],
+    "kind": "spoken",
+    "topic": "Comida, botânica",
+    "format": "tf",
+    "item": "saca só",
+    "note": "«saca só» = schau mal, hör dir das an. Damit kündigt man etwas Überraschendes an. Es kommt von «sacar» (kapieren): «Sacou?» heißt «Kapiert?». Sehr umgangssprachlich.",
+    "capiWrong": "Saca só: o caju te enganou direitinho!"
+  },
+  {
+    "kind": "vocab",
+    "topic": "Natureza, animais",
+    "format": "mc",
+    "item": "o morcego",
+    "question": "O morcego tem um título exclusivo entre os mamíferos. Qual?",
+    "options": [
+      "É o único mamífero capaz de voar de verdade",
+      "É o único mamífero que bota ovos",
+      "É o único mamífero sem dentes",
+      "É o único mamífero que vive só no Brasil"
+    ],
+    "answer": 0,
+    "explain": "Os morcegos são os únicos mamíferos com voo ativo de verdade. Esquilos-voadores só planam. Muitos morcegos ainda ajudam a polinizar plantas e espalhar sementes.",
+    "note": "«o morcego» = die Fledermaus. Das Wort ist immer maskulin, auch beim Weibchen. Es stammt vom lateinischen «mus caecus», «blinde Maus». Dabei sind Fledermäuse gar nicht blind!",
+    "source": "Britannica",
+    "capiRight": "Acertou! O morcego te dá um abraço de asa.",
+    "capiWrong": "Errou! Bota ovo quem bota é o ornitorrinco, viu?"
+  },
+  {
+    "kind": "grammar",
+    "topic": "História do Brasil",
+    "format": "cloze",
+    "item": "embora + subjuntivo",
+    "question": "Embora o Brasil ___ independente desde 1822, a escravidão só foi abolida em 1888, com a Lei Áurea.",
+    "options": [
+      "era",
+      "fosse",
+      "foi",
+      "é"
+    ],
+    "answer": 1,
+    "explain": "Depois de «embora» vem sempre o subjuntivo. O Brasil foi o último país das Américas a abolir a escravidão, em 13 de maio de 1888.",
+    "note": "«embora + subjuntivo» = obwohl. Anders als im Deutschen folgt immer der Subjuntivo: «embora seja» in der Gegenwart, «embora fosse» in der Vergangenheit. Im Alltag hört man oft die bequemere Variante «apesar de + Infinitiv»: «apesar de ser independente».",
+    "source": "Britannica",
+    "capiRight": "Embora capivara seja preguiçosa, você mandou ver!",
+    "capiWrong": "Embora tenha errado, você é gente boa!"
+  }
+]
