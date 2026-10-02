@@ -222,7 +222,13 @@ test('⌄ folds the band to its header line, › opens it again, and a new sessi
   await start($, clock)
   const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
   const toggle = (await ui.find({ key: 'size' })) as any
-  expect(toggle.props.label.trim()).toBe('') // Desktop draws the chevron under a blank button
+  expect(toggle.props.label).toBe('\u00a0\u00a0\u00a0') // Desktop draws the chevron under a blank button of no-break spaces
+  // the button is positioned and comes after the drawing, so it is painted on top and takes the click
+  const header = ((await ui.find({ type: 'Box' })) as any).children[0]
+  const wrap = header.children[1].children[0].children[0]
+  expect(wrap.children[0].props.position).toBe('absolute')
+  expect(wrap.children[1].props.position).toBe('relative')
+  expect(wrap.children[1].children[0].props.key).toBe('size')
   expect(toggle.props.hotkey).toBeUndefined()
   const drawing = async () => ((await ui.find({ type: 'Svg' })) as any).props.source as string
   const down = await drawing()
@@ -231,10 +237,10 @@ test('⌄ folds the band to its header line, › opens it again, and a new sessi
   expect(folded.children.length).toBe(1) // the header line alone
   expect(await ui.find({ key: 'opt-0' })).toBeUndefined()
   expect(await ui.find({ key: 'gram' })).toBeUndefined()
-  // › is ⌄ turned a quarter about the drawing's centre (7, 8), as Claude's question cards draw them
+  // › is ⌄ turned a quarter about the drawing's centre (8, 8), as Claude's question cards draw them
   const right = await drawing()
   const points = (src: string) => /d="M(.+?)"/.exec(src)![1].split(' L').map((p) => p.split(' ').map(Number))
-  const turned = points(down).map(([x, y]) => [7 + (y - 8), 8 - (x - 7)])
+  const turned = points(down).map(([x, y]) => [8 + (y - 8), 8 - (x - 8)])
   expect(points(right).sort()).toEqual(turned.sort())
   expect(store.get('minimized')).toBe(true)
   await ui.press({ key: 'size' })
