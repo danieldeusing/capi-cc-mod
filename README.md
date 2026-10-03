@@ -29,6 +29,12 @@ Click – at the right end of the header to fold the band to that one line, and
 Click × next to it to hide Capi in this session. Only this session: a new
 session shows the band again, and `/capi show` brings it back right away.
 
+With `CAPI_PLACE=pane` the card sits in a pane beside the conversation (above the
+prompt where the window is too narrow to dock one). The pane takes the keys once it
+has focus: click it, or ctrl+x tab. Its own close mark hides Capi for the session,
+as × does the band, and `/capi show` opens it again. A pane opened unasked waits on a
+narrow window; `/capi show` opens it at any width.
+
 `/capi` shows level, streak, points, what is due, and how the last sync and card
 generation went. It answers instantly, also while Claude works. `/capi skip` drops
 the current card, and `/capi show` brings back a band you closed with ×.
@@ -114,6 +120,7 @@ Capi reads the file when a session starts, so open a new session (or run
 | `CAPI_PERSONS` | the rows of the conjugation table, separated by `\|` | `eu\|você\|ele/ela\|nós\|vocês` |
 | `CAPI_TENSES` | its columns, separated by `\|` | `presente\|pretérito perfeito\|pretérito imperfeito\|futuro\|subjuntivo presente` |
 | `CAPI_SHOW` | when the band is there: `always`, or `working` for only while Claude works | `always` |
+| `CAPI_PLACE` | where the card is drawn: `band` above the prompt, or `pane`, a panel beside the conversation like the terminal and browser in Claude Code Desktop | `band` |
 | `CAPI_NEW_PER_DAY` | new expressions a day at most; after that only reviews and bonus cards, and `0` means reviews only | `25` |
 
 An English speaker learning Portuguese, with cards about football and music:

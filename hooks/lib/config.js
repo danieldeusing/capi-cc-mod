@@ -17,6 +17,8 @@ export const DEFAULTS = {
   CAPI_SHOW: 'always',
   // New expressions a day at most, across all sessions and Macs; 0 means reviews only.
   CAPI_NEW_PER_DAY: '25',
+  // Where the card is drawn: the band above the prompt, or a pane beside the conversation.
+  CAPI_PLACE: 'band',
 }
 
 // KEY=value lines; blank lines and # comments skipped, one pair of quotes around
@@ -51,6 +53,7 @@ export function configFrom(env = {}) {
     tenses: list(get('CAPI_TENSES')),
     show: get('CAPI_SHOW').toLowerCase() === 'working' ? 'working' : 'always',
     newPerDay: count(get('CAPI_NEW_PER_DAY')),
+    place: get('CAPI_PLACE').toLowerCase() === 'pane' ? 'pane' : 'band',
   }
 }
 

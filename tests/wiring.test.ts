@@ -37,6 +37,8 @@ function engine(on: any, replies: unknown[], files = new Map<string, string>(), 
   const logs: string[] = []
   const writes: string[] = []
   const toasts: string[] = []
+  const opens: string[] = []
+  const closes: string[] = []
   const clock = mock.clock(on, { now: T0 })
   const list = (path: string) =>
     [...files.keys()]
@@ -68,6 +70,8 @@ function engine(on: any, replies: unknown[], files = new Map<string, string>(), 
   on('command.register', () => ({ value: undefined }))
   on('ui.log', ($: any, e: any) => (logs.push(e.text), { value: undefined }))
   on('ui.toast', ($: any, e: any) => (toasts.push(e.text), { value: undefined }))
+  on('ui.open', ($: any, e: any) => (opens.push(e.id), { value: { isPlaced: true } }))
+  on('ui.close', ($: any, e: any) => (closes.push(e.id), { value: undefined }))
   on('model.complete', ($: any, e: any) => {
     model.push(e)
     return { value: replies.shift() ?? { isAnswered: false, reason: 'api-error' } }
@@ -76,7 +80,7 @@ function engine(on: any, replies: unknown[], files = new Map<string, string>(), 
   on('turn.start', ($: any, e: any) => ({ turnId: e.turnId }))
   on('turn.complete', () => ({ text: '' }))
   on('ui.render', () => ({ type: 'Text', props: {}, children: ['engine'] }))
-  return { store, files, model, logs, writes, toasts, clock }
+  return { store, files, model, logs, writes, toasts, opens, closes, clock }
 }
 
 // every string under a node, in drawing order
@@ -95,6 +99,14 @@ const BAND = {
   component: 'AbovePrompt',
   viewport: { columns: 120, rows: 40 },
   props: { hasSurvey: false, isWorking: true, maxRows: 20, bodyColumns: 120, scroll: { offset: 0, bodyRows: 20 }, view: {} },
+} as const
+
+const PANE = {
+  plugin: 'capi',
+  component: 'Pane',
+  requestId: 'capi',
+  viewport: { columns: 120, rows: 40 },
+  props: { title: 'Capi', isFocused: false, bodyColumns: 80, placement: 'dock', scroll: { offset: 0, bodyRows: 40 }, view: {} },
 } as const
 
 async function start($: any, clock: any) {
@@ -298,6 +310,33 @@ test('a card that arrives after the turn ended shows while idle', async ($, on) 
   const idle = { ...BAND, props: { ...BAND.props, isWorking: false } }
   const ui = await $.ui.mount({ ...idle, surface: 'desktop' })
   expect(await ui.find({ type: 'Text', text: /ficam de fora/ })).toBeDefined()
+})
+
+test('CAPI_PLACE=pane draws the card in a pane, and the band stays empty', async ($, on) => {
+  const { clock, opens } = engine(on, [reply(five())], new Map(), new Set(), 'CAPI_PLACE=pane\n')
+  await start($, clock)
+  expect(opens).toContain('capi')
+  const band = await $.ui.mount({ ...BAND, surface: 'desktop' })
+  expect(await band.find({ key: 'opt-0' })).toBeUndefined()
+  for (const surface of ['terminal', 'desktop'] as const) {
+    const pane = await $.ui.mount({ ...PANE, surface } as any)
+    expect(await pane.find({ type: 'Text', text: /ficam de fora/ })).toBeDefined()
+    expect(await pane.find({ key: 'opt-0' })).toBeDefined()
+    expect(await pane.find({ key: 'close' })).toBeUndefined() // the pane has the engine's own close mark
+    expect(await pane.find({ key: 'size' })).toBeUndefined()
+  }
+})
+
+test('CAPI_PLACE=pane with CAPI_SHOW=working opens the pane for a turn and closes it after', async ($, on) => {
+  const { clock, opens, closes } = engine(on, [reply(five())], new Map(), new Set(), 'CAPI_PLACE=pane\nCAPI_SHOW=working\n')
+  await $.session.start({ surface: 'desktop', isInteractive: true, cwd: '/work' })
+  await clock.settle()
+  expect(opens).toEqual([]) // nothing while idle
+  await $.turn.start({ text: 'do something', turnId: 't1' })
+  await clock.settle()
+  expect(opens).toContain('capi')
+  await $.turn.complete({ turnId: 't1', answer: 'done', durationMs: 1, isAborted: false, usage: null } as any)
+  expect(closes).toContain('capi')
 })
 
 test('CAPI_SHOW=working shows the band only while Claude works', async ($, on) => {

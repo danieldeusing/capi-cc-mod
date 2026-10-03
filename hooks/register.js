@@ -60,6 +60,9 @@ const PRESS_GUARD_MS = 800
 const FLAG_CONFIRM_MS = 10_000
 const VOICE = 'Luciana'
 const ICLOUD = 'Library/Mobile Documents/com~apple~CloudDocs/capi'
+// CAPI_PLACE=pane: the card in a pane of this id, docked beside the conversation where the surface docks one.
+const PANE = 'capi'
+const openPane = ($) => $.ui.open({ id: PANE, title: 'Capi' })
 
 
 let home = ''
@@ -81,7 +84,8 @@ let open = null
 let verbTab = null
 // The band folded to its header line. Kept in $.store, so a new session opens it the same way.
 let minimized = false
-// The band closed with ×: this session only, so a new session or /capi show brings it back.
+// The band closed with ×, or the pane with its close mark: this session only, so a new
+// session or /capi show brings it back.
 let closed = false
 let loading = null
 let syncReport = 'not synced yet'
@@ -106,6 +110,8 @@ export function register(on) {
       argumentHint: '[skip|show]',
       immediate: true,
     })
+    // Not awaited: an unasked pane waits undrawn on a narrow window until /capi show.
+    if (cfg.place === 'pane' && cfg.show === 'always') void openPane($)
     return next(e)
   })
 
@@ -116,8 +122,9 @@ export function register(on) {
     }
     if (e.args.trim() === 'show') {
       closed = false
+      if (cfg.place === 'pane') await openPane($)
       $.ui.invalidate('ui.render')
-      return { text: 'Capi: back above the prompt' }
+      return { text: cfg.place === 'pane' ? 'Capi: pane open' : 'Capi: back above the prompt' }
     }
     await sync($).catch((err) => (syncReport = 'sync failed: ' + (err?.message ?? err)))
     return { text: statsText(await $.clock.now()) }
@@ -127,7 +134,20 @@ export function register(on) {
     if (!current) current = (await $.store.get('current')) ?? null
     if (!current) await advance($)
     else refillIfLow($)
+    if (cfg.place === 'pane' && !closed && !e.agentId) void openPane($)
     $.ui.invalidate('ui.render')
+    return next(e)
+  })
+
+  // CAPI_SHOW=working: the pane goes when the main turn ends (a subagent's turn carries an agentId).
+  on('turn.complete', async ($, e, next) => {
+    if (cfg.place === 'pane' && cfg.show === 'working' && !e.agentId) await $.ui.close({ id: PANE })
+    return next(e)
+  })
+
+  // The person closing the pane hides Capi for the session, as × does the band.
+  on('ui.close', async ($, e, next) => {
+    if (e.id === PANE && e.origin.kind === 'person') closed = true
     return next(e)
   })
 
@@ -140,19 +160,8 @@ export function register(on) {
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     // Working or not, unless CAPI_SHOW=working: a card waits until it is answered,
     // and only answering pulls new cards, so a visible band never costs a model call.
-    if (e.props.hasSurvey || closed || (cfg.show === 'working' && !e.props.isWorking)) return next(e)
-    const { Box, Text, Button } = $.ui.resolve(e)
-    const parts = view(Box, Text, Button, (e.props.bodyColumns ?? 80) - ICON_W, {
-      pick: (id, i) => pick($, id, i),
-      grade: (id, ok) => grade($, id, ok),
-      next: (id) => nextCard($, id),
-      speak: () => speak($),
-      flag: (id) => flag($, id),
-      extra: (id, kind) => toggleExtra($, id, kind),
-      verb: (id, index) => {
-        verbTab = { id, index }
-        $.ui.invalidate('ui.render')
-      },
+    if (cfg.place === 'pane' || e.props.hasSurvey || closed || (cfg.show === 'working' && !e.props.isWorking)) return next(e)
+    return draw($, e, e.props.maxRows ?? 99, {
       close: () => {
         closed = true
         $.ui.invalidate('ui.render')
@@ -164,9 +173,31 @@ export function register(on) {
         await $.store.set('minimized', minimized)
       },
     })
-    const body = parts.map((p) => (p.flush ? p : indent(Box, Text, p, e.surface)))
-    return Box({ flexDirection: 'column', children: fit(body, e.props.maxRows ?? 99, (e.props.bodyColumns ?? 80) - ICON_W) })
   })
+
+  // The pane has the engine's own close mark and scrolls itself: no window controls, no row cap.
+  on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => draw($, e, Infinity, {}))
+}
+
+// The card for the band or the pane; `window` holds the band's – and × (close, size).
+function draw($, e, maxRows, window) {
+  const { Box, Text, Button } = $.ui.resolve(e)
+  const cols = (e.props.bodyColumns ?? 80) - ICON_W
+  const parts = view(Box, Text, Button, cols, {
+    pick: (id, i) => pick($, id, i),
+    grade: (id, ok) => grade($, id, ok),
+    next: (id) => nextCard($, id),
+    speak: () => speak($),
+    flag: (id) => flag($, id),
+    extra: (id, kind) => toggleExtra($, id, kind),
+    verb: (id, index) => {
+      verbTab = { id, index }
+      $.ui.invalidate('ui.render')
+    },
+    ...window,
+  })
+  const body = parts.map((p) => (p.flush ? p : indent(Box, Text, p, e.surface)))
+  return Box({ flexDirection: 'column', children: fit(body, maxRows, cols) })
 }
 
 // The plugin's own .env (see .env.example). No file, or no such key, keeps the default.
@@ -251,11 +282,12 @@ function view(Box, Text, Button, cols, act) {
       control('close', '×', act.close),
     ],
   })
-  // The header line: the pairs, and the window controls at its right end.
-  const top = { ...head, make: (cut) => head.make(cut, controls) }
+  // The header line: the pairs, and the window controls at its right end (the band's only).
+  const top = act.close ? { ...head, make: (cut) => head.make(cut, controls) } : head
+  const folded = minimized && Boolean(act.size)
   // Folded, or with no card yet: the header line with 🔼/🔽 alone at its right.
-  if (minimized || !current) {
-    if (minimized) return [top]
+  if (folded || !current) {
+    if (folded) return [top]
     const msg = refilling
       ? 'Capi está preparando cartas… ☕'
       : failure
