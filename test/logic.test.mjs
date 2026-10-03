@@ -253,6 +253,11 @@ test('the settings file is read plainly, and every prompt follows it', async () 
   assert.match(req.prompt, /Spread the facts across: football and music\./)
   assert.equal(cfg.show, 'always')
   assert.equal(cfg.newPerDay, 25)
+  assert.equal(cfg.place, 'band')
+  assert.equal(cfg.paneOpen, 'auto')
+  assert.equal(configFrom({ CAPI_PLACE: 'Pane', CAPI_PANE_OPEN: 'MANUAL' }).place, 'pane')
+  assert.equal(configFrom({ CAPI_PANE_OPEN: 'MANUAL' }).paneOpen, 'manual')
+  assert.equal(configFrom({ CAPI_PANE_OPEN: 'later' }).paneOpen, 'auto') // anything else keeps the default
   assert.equal(configFrom({ CAPI_NEW_PER_DAY: '40' }).newPerDay, 40)
   assert.equal(configFrom({ CAPI_NEW_PER_DAY: '0' }).newPerDay, 0) // reviews only
   assert.equal(configFrom({ CAPI_NEW_PER_DAY: 'lots' }).newPerDay, 25)

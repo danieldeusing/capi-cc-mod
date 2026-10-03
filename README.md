@@ -121,6 +121,7 @@ Capi reads the file when a session starts, so open a new session (or run
 | `CAPI_TENSES` | its columns, separated by `\|` | `presente\|pretérito perfeito\|pretérito imperfeito\|futuro\|subjuntivo presente` |
 | `CAPI_SHOW` | when the band is there: `always`, or `working` for only while Claude works | `always` |
 | `CAPI_PLACE` | where the card is drawn: `band` above the prompt, or `pane`, a panel beside the conversation like the terminal and browser in Claude Code Desktop | `band` |
+| `CAPI_PANE_OPEN` | with `CAPI_PLACE=pane`: `auto` opens the pane by itself when a session starts (with `CAPI_SHOW=working`, when a turn starts), `manual` only with `/capi show` | `auto` |
 | `CAPI_NEW_PER_DAY` | new expressions a day at most; after that only reviews and bonus cards, and `0` means reviews only | `25` |
 
 An English speaker learning Portuguese, with cards about football and music:

@@ -111,7 +111,7 @@ export function register(on) {
       immediate: true,
     })
     // Not awaited: an unasked pane waits undrawn on a narrow window until /capi show.
-    if (cfg.place === 'pane' && cfg.show === 'always') void openPane($)
+    if (cfg.place === 'pane' && cfg.paneOpen === 'auto' && cfg.show === 'always') void openPane($)
     return next(e)
   })
 
@@ -134,7 +134,7 @@ export function register(on) {
     if (!current) current = (await $.store.get('current')) ?? null
     if (!current) await advance($)
     else refillIfLow($)
-    if (cfg.place === 'pane' && !closed && !e.agentId) void openPane($)
+    if (cfg.place === 'pane' && cfg.paneOpen === 'auto' && !closed && !e.agentId) void openPane($)
     $.ui.invalidate('ui.render')
     return next(e)
   })

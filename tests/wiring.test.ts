@@ -327,6 +327,15 @@ test('CAPI_PLACE=pane draws the card in a pane, and the band stays empty', async
   }
 })
 
+test('CAPI_PANE_OPEN=manual leaves the pane shut until /capi show', async ($, on) => {
+  const { clock, opens } = engine(on, [reply(five())], new Map(), new Set(), 'CAPI_PLACE=pane\nCAPI_PANE_OPEN=manual\n')
+  await start($, clock)
+  expect(opens).toEqual([]) // neither the session start nor the turn opened it
+  const r = (await $.command.run({ command: 'capi', args: 'show' })) as any
+  expect(r.text).toMatch(/pane open/)
+  expect(opens).toEqual(['capi'])
+})
+
 test('CAPI_PLACE=pane with CAPI_SHOW=working opens the pane for a turn and closes it after', async ($, on) => {
   const { clock, opens, closes } = engine(on, [reply(five())], new Map(), new Set(), 'CAPI_PLACE=pane\nCAPI_SHOW=working\n')
   await $.session.start({ surface: 'desktop', isInteractive: true, cwd: '/work' })

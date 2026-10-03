@@ -19,6 +19,8 @@ export const DEFAULTS = {
   CAPI_NEW_PER_DAY: '25',
   // Where the card is drawn: the band above the prompt, or a pane beside the conversation.
   CAPI_PLACE: 'band',
+  // The pane opens by itself (auto: when a session starts, or a turn with CAPI_SHOW=working), or only by /capi show.
+  CAPI_PANE_OPEN: 'auto',
 }
 
 // KEY=value lines; blank lines and # comments skipped, one pair of quotes around
@@ -54,6 +56,7 @@ export function configFrom(env = {}) {
     show: get('CAPI_SHOW').toLowerCase() === 'working' ? 'working' : 'always',
     newPerDay: count(get('CAPI_NEW_PER_DAY')),
     place: get('CAPI_PLACE').toLowerCase() === 'pane' ? 'pane' : 'band',
+    paneOpen: get('CAPI_PANE_OPEN').toLowerCase() === 'manual' ? 'manual' : 'auto',
   }
 }
 
