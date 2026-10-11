@@ -467,7 +467,8 @@ function fit(parts, maxRows, cols) {
 // Opens or closes one extra panel; opening one closes the others. A panel the
 // card has no content for yet is generated on that first opening, and the
 // result is kept on the shared card, so no session pays for it twice.
-async function toggleExtra($, id, kind) {
+// The model call runs after the press: the band takes no other press while one is open.
+function toggleExtra($, id, kind) {
   if (!current || current.card.id !== id) return
   const x = EXTRAS[kind]
   open = open?.id === id && open.kind === kind ? null : { id, kind }
@@ -476,6 +477,11 @@ async function toggleExtra($, id, kind) {
   if (open?.kind !== kind || (loading?.id === id && loading.kind === kind) || x.has(card)) return
   loading = { id, kind }
   $.ui.invalidate('ui.render')
+  $.clock.after(0, () => fetchExtra($, id, kind, card))
+}
+
+async function fetchExtra($, id, kind, card) {
+  const x = EXTRAS[kind]
   const r = await complete($, x.call, x.request(card))
   loading = null
   const fields = r.ok ? x.parse(r.text) : {}
@@ -593,6 +599,11 @@ async function flag($, id) {
   await $.store.set('current', current)
   $.ui.invalidate('ui.render')
   await record($, { type: 'flag', id: `${now.toString(36)}-f${Math.random().toString(36).slice(2, 8)}`, t: now, machine, cardId: id, fact })
+  $.clock.after(0, () => checkFact($, card, fact))
+}
+
+// Runs after the 🚩 press, which would otherwise hold the band for the whole call.
+async function checkFact($, card, fact) {
   const r = await complete($, CHECK, {
     system:
       'You fact-check one quiz card. Answer in German, in at most three sentences: is the fact correct, wrong or doubtful, and what is true. Name the kind of source you rely on.',
@@ -720,11 +731,14 @@ async function sync($) {
 
 // ---- cards -----------------------------------------------------------------
 
+// After the current dispatch: a press that advances must not wait for a batch.
 function refillIfLow($) {
-  refill($).catch((err) => {
-    refilling = false
-    lastBatch = 'failed: ' + (err?.message ?? err)
-  })
+  $.clock.after(0, () =>
+    refill($).catch((err) => {
+      refilling = false
+      lastBatch = 'failed: ' + (err?.message ?? err)
+    }),
+  )
 }
 
 async function refill($) {

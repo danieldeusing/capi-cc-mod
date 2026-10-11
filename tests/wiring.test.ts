@@ -214,6 +214,7 @@ test('🚩 needs a second press, and only then asks for a re-check', async ($, o
   expect(model.length).toBe(1)
   expect(await ui.find({ key: 'flag' })).toMatchObject({ props: { label: '🚩 de novo = confirmar' } })
   await ui.press({ key: 'flag' })
+  await clock.settle()
   expect(model.length).toBe(2)
   expect(model[1].effort).toBe('xhigh')
   const log = store.get('log:2026-10-02:sess1') as any[]
@@ -386,6 +387,7 @@ test('🇩🇪 on a card made before translations translates it once, and every 
   await start($, clock)
   const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
   await ui.press({ key: 'de' })
+  await clock.settle()
   expect(model.length).toBe(2)
   expect(model[1]).toMatchObject({ model: 'claude-opus-5-5', effort: 'low' })
   expect(await ui.find({ type: 'Text', text: /^Nur Chile und Ecuador/ })).toBeDefined()
@@ -401,6 +403,10 @@ test('a translation that fails says so and closes again', async ($, on) => {
   await start($, clock)
   const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
   await ui.press({ key: 'de' })
+  // the press is done before the model call starts, so the band takes the next press at once
+  expect(model.length).toBe(1)
+  expect(await ui.find({ key: 'de' })).toMatchObject({ props: { label: '🇩🇪 …' } })
+  await clock.settle()
   expect(model.length).toBe(2)
   expect(toasts.some((t) => t.includes('não conseguiu (tradução'))).toBe(true)
   expect(await ui.find({ key: 'de' })).toMatchObject({ props: { label: '🇩🇪 tradução' } })
@@ -464,10 +470,12 @@ test('📐 and 🔤 are generated once each, at their effort, and only one panel
   const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
 
   await ui.press({ key: 'gram' })
+  await clock.settle()
   expect(model[1]).toMatchObject({ effort: 'medium' })
   expect(await ui.find({ type: 'Text', text: /^«do caju» = de \+ o/ })).toBeDefined()
 
   await ui.press({ key: 'conj' })
+  await clock.settle()
   expect(model[2]).toMatchObject({ effort: 'low' })
   // a table as in the morning briefs: tenses across, one row per person, no title line; one verb is still a tab
   expect(await ui.find({ key: 'verb-0' })).toMatchObject({ props: { label: '▸ ser' } })
@@ -510,6 +518,7 @@ test('🔤 shows one verb at a time in tabs, and an open panel stands apart from
   await start($, clock)
   const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
   await ui.press({ key: 'conj' })
+  await clock.settle()
 
   expect(await ui.find({ key: 'verb-0' })).toMatchObject({ props: { label: '▸ sacar' } })
   expect(await ui.find({ key: 'verb-1' })).toMatchObject({ props: { label: 'ser' } })
